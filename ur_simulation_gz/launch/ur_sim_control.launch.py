@@ -38,7 +38,12 @@ from launch.actions import (
 from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import (
+    Command,
+    FindExecutable,
+    LaunchConfiguration,
+    PathJoinSubstitution,
+)
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -58,6 +63,8 @@ def launch_setup(context, *args, **kwargs):
     start_joint_controller = LaunchConfiguration("start_joint_controller")
     initial_joint_controller = LaunchConfiguration("initial_joint_controller")
     launch_rviz = LaunchConfiguration("launch_rviz")
+    gazebo_gui = LaunchConfiguration("gazebo_gui")
+    world_file = LaunchConfiguration("world_file")
 
     initial_joint_controllers = PathJoinSubstitution(
         [FindPackageShare(runtime_config_package), "config", controllers_file]
@@ -160,12 +167,30 @@ def launch_setup(context, *args, **kwargs):
             "true",
         ],
     )
-
-    gz_launch_description = IncludeLaunchDescription(
+    gz_launch_description_with_gui = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [FindPackageShare("ros_gz_sim"), "/launch/gz_sim.launch.py"]
         ),
-        launch_arguments={"gz_args": " -r -v 4 empty.sdf"}.items(),
+        launch_arguments={"gz_args": [" -r -v 4 ", world_file]}.items(),
+        condition=IfCondition(gazebo_gui),
+    )
+
+    gz_launch_description_without_gui = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [FindPackageShare("ros_gz_sim"), "/launch/gz_sim.launch.py"]
+        ),
+        launch_arguments={"gz_args": [" -s -r -v 4 ", world_file]}.items(),
+        condition=UnlessCondition(gazebo_gui),
+    )
+
+    # Make the /clock topic available in ROS
+    gz_sim_bridge = Node(
+        package="ros_gz_bridge",
+        executable="parameter_bridge",
+        arguments=[
+            "/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock",
+        ],
+        output="screen",
     )
 
     nodes_to_start = [
@@ -175,7 +200,9 @@ def launch_setup(context, *args, **kwargs):
         initial_joint_controller_spawner_stopped,
         initial_joint_controller_spawner_started,
         gz_spawn_entity,
-        gz_launch_description,
+        gz_launch_description_with_gui,
+        gz_launch_description_without_gui,
+        gz_sim_bridge,
     ]
 
     return nodes_to_start
@@ -188,7 +215,19 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "ur_type",
             description="Type/series of used UR robot.",
-            choices=["ur3", "ur3e", "ur5", "ur5e", "ur10", "ur10e", "ur16e", "ur20", "ur30"],
+            choices=[
+                "ur3",
+                "ur3e",
+                "ur5",
+                "ur5e",
+                "ur7e",
+                "ur10",
+                "ur10e",
+                "ur12e",
+                "ur16e",
+                "ur20",
+                "ur30",
+            ],
             default_value="ur5e",
         )
     )
@@ -269,6 +308,18 @@ def generate_launch_description():
     )
     declared_arguments.append(
         DeclareLaunchArgument("launch_rviz", default_value="true", description="Launch RViz?")
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "gazebo_gui", default_value="true", description="Start gazebo with GUI?"
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "world_file",
+            default_value="empty.sdf",
+            description="Gazebo world file (absolute path or filename from the gazebosim worlds collection) containing a custom world.",
+        )
     )
 
     return LaunchDescription(declared_arguments + [OpaqueFunction(function=launch_setup)])
