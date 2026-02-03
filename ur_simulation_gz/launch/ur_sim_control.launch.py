@@ -141,6 +141,28 @@ def launch_setup(context, *args, **kwargs):
         condition=UnlessCondition(activate_joint_controller),
     )
 
+    forward_position_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["forward_position_controller", "-c", "/controller_manager", "--inactive"],
+    )
+
+    delay_forward_position_after_initial = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=initial_joint_controller_spawner_started,
+            on_exit=[forward_position_controller_spawner],
+        ),
+        condition=IfCondition(activate_joint_controller),
+    )
+
+    delay_forward_position_after_initial_stopped = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=initial_joint_controller_spawner_stopped,
+            on_exit=[forward_position_controller_spawner],
+        ),
+        condition=UnlessCondition(activate_joint_controller),
+    )
+
     # GZ nodes
     gz_spawn_entity = Node(
         package="ros_gz_sim",
@@ -185,6 +207,8 @@ def launch_setup(context, *args, **kwargs):
         delay_rviz_after_joint_state_broadcaster_spawner,
         initial_joint_controller_spawner_stopped,
         initial_joint_controller_spawner_started,
+        delay_forward_position_after_initial,
+        delay_forward_position_after_initial_stopped,
         gz_spawn_entity,
         gz_launch_description,
         gz_sim_bridge,
