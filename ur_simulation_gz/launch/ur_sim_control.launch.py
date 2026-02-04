@@ -82,7 +82,7 @@ def launch_setup(context, *args, **kwargs):
             safety_k_position,
             " ",
             "name:=",
-            "ur",
+            ur_type,
             " ",
             "ur_type:=",
             ur_type,
