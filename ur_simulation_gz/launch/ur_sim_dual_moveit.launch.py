@@ -30,7 +30,7 @@
 # Top-level launcher: simulation + MoveIt for both arms.
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
@@ -68,7 +68,10 @@ def launch_setup(context, *args, **kwargs):
         }.items(),
     )
 
-    return [ur_dual_control_launch, ur_dual_moveit_launch]
+    # Delay MoveIt+RViz until controllers are up (avoids TF "jump back in time", Link does not exist, RViz crash)
+    delayed_moveit = TimerAction(period=25.0, actions=[ur_dual_moveit_launch])
+
+    return [ur_dual_control_launch, delayed_moveit]
 
 
 def generate_launch_description():

@@ -24,6 +24,7 @@
 
   <xacro:arg name="simulation_controllers" default="" />
   <xacro:arg name="ros_namespace" default="" />
+  <xacro:arg name="base_xyz" default="0 0 0" />
 
   <!-- create link fixed to the "world" -->
   <link name="world" />
@@ -66,7 +67,7 @@
     safety_k_position="$(arg safety_k_position)"
     force_abs_paths="true"
     >
-    <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
+    <origin xyz="$(arg base_xyz)" rpy="0 0 0" />          <!-- position robot in the world -->
   </xacro:ur_robot>
 
   <gazebo reference="world">

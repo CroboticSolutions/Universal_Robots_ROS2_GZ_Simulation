@@ -35,8 +35,8 @@ def launch_setup(context, *args, **kwargs):
     sim_gz_share = get_package_share_directory("ur_simulation_gz")
     moveit_config_share = get_package_share_directory("ur_moveit_config")
 
-    controllers_ur1 = os.path.join(sim_gz_share, "config", "ur_controllers_ur1.yaml")
-    controllers_ur2 = os.path.join(sim_gz_share, "config", "ur_controllers_ur2.yaml")
+    controllers_ur1 = os.path.join(sim_gz_share, "config", "ur_controllers_sim_ur1.yaml")
+    controllers_ur2 = os.path.join(sim_gz_share, "config", "ur_controllers_sim_ur2.yaml")
 
     ur_type_val = context.perform_substitution(ur_type)
 
@@ -53,6 +53,7 @@ def launch_setup(context, *args, **kwargs):
                 "safety_pos_margin": "0.15",
                 "safety_k_position": "20",
                 "ros_namespace": "ur1",
+                "base_xyz": "0 0 0",
                 "simulation_controllers": controllers_ur1,
             },
         )
@@ -81,6 +82,7 @@ def launch_setup(context, *args, **kwargs):
                 "safety_pos_margin": "0.15",
                 "safety_k_position": "20",
                 "ros_namespace": "ur2",
+                "base_xyz": "1 0 0",
                 "simulation_controllers": controllers_ur2,
             },
         )
@@ -133,7 +135,7 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    rviz_config_file = os.path.join(moveit_config_share, "config", "moveit.rviz")
+    rviz_config_file = os.path.join(sim_gz_share, "config", "moveit_dual.rviz")
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
@@ -146,8 +148,14 @@ def launch_setup(context, *args, **kwargs):
             moveit_config_ur1.robot_description_kinematics,
             moveit_config_ur1.planning_pipelines,
             moveit_config_ur1.joint_limits,
+            {"robot_description_ur2": list(moveit_config_ur2.robot_description.values())[0]},
+            {"robot_description_ur2_semantic": list(moveit_config_ur2.robot_description_semantic.values())[0]},
+            {"robot_description_ur2_kinematics": list(moveit_config_ur2.robot_description_kinematics.values())[0]},
             warehouse_config,
             {"use_sim_time": use_sim_time},
+        ],
+        remappings=[
+            ("/joint_states", "/ur1/joint_states"),
         ],
     )
 

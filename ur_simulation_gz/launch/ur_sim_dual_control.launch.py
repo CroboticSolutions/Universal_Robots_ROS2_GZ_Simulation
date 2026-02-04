@@ -34,6 +34,7 @@ from launch.actions import (
     IncludeLaunchDescription,
     OpaqueFunction,
     RegisterEventHandler,
+    TimerAction,
 )
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -58,8 +59,9 @@ def launch_setup(context, *args, **kwargs):
     world_file = LaunchConfiguration("world_file")
 
     pkg_share = FindPackageShare("ur_simulation_gz")
-    controllers_ur1 = PathJoinSubstitution([pkg_share, "config", "ur_controllers_ur1.yaml"])
-    controllers_ur2 = PathJoinSubstitution([pkg_share, "config", "ur_controllers_ur2.yaml"])
+    # Use sim-specific configs (no io_and_status, speed_scaling) to avoid configure failures
+    controllers_ur1 = PathJoinSubstitution([pkg_share, "config", "ur_controllers_sim_ur1.yaml"])
+    controllers_ur2 = PathJoinSubstitution([pkg_share, "config", "ur_controllers_sim_ur2.yaml"])
 
     # Robot 1 (ur1) description
     robot_description_ur1 = Command(
@@ -116,18 +118,24 @@ def launch_setup(context, *args, **kwargs):
             " ",
             "ros_namespace:=ur2",
             " ",
+            'base_xyz:="1 0 0"',
+            " ",
             "simulation_controllers:=",
             controllers_ur2,
         ]
     )
 
-    # Robot state publishers (one per namespace)
+    # Robot state publishers (one per namespace); remap tf to global /tf for RViz
     robot_state_publisher_ur1 = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
         namespace="ur1",
         output="both",
         parameters=[{"use_sim_time": True}, {"robot_description": robot_description_ur1}],
+        remappings=[
+            ("tf", "/tf"),
+            ("tf_static", "/tf_static"),
+        ],
     )
     robot_state_publisher_ur2 = Node(
         package="robot_state_publisher",
@@ -135,6 +143,10 @@ def launch_setup(context, *args, **kwargs):
         namespace="ur2",
         output="both",
         parameters=[{"use_sim_time": True}, {"robot_description": robot_description_ur2}],
+        remappings=[
+            ("tf", "/tf"),
+            ("tf_static", "/tf_static"),
+        ],
     )
 
     # Gazebo launch (single world)
@@ -166,7 +178,7 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    # Spawn ur2 (second robot, offset in x)
+    # Spawn ur2 (second robot; base_xyz in URDF handles offset, no -x here)
     gz_spawn_ur2 = Node(
         package="ros_gz_sim",
         executable="create",
@@ -178,33 +190,74 @@ def launch_setup(context, *args, **kwargs):
             "ur2",
             "-allow_renaming",
             "true",
-            "-x",
-            "1.0",
         ],
     )
 
-    # Controller spawners for ur1
+    # Spawner args: longer timeouts for sim startup; sequential spawn avoids race
+    spawner_common = ["--controller-manager-timeout", "30", "--switch-timeout", "30"]
+
+    # Controller spawners for ur1 (param-file ensures correct config for configure step)
     joint_state_broadcaster_ur1 = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_state_broadcaster", "-c", "/ur1/controller_manager"],
+        arguments=[
+            "joint_state_broadcaster",
+            "-c",
+            "/ur1/controller_manager",
+            "-p",
+            controllers_ur1,
+        ]
+        + spawner_common,
     )
     scaled_joint_trajectory_ur1 = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["scaled_joint_trajectory_controller", "-c", "/ur1/controller_manager"],
+        arguments=[
+            "scaled_joint_trajectory_controller",
+            "-c",
+            "/ur1/controller_manager",
+            "-p",
+            controllers_ur1,
+        ]
+        + spawner_common,
     )
 
     # Controller spawners for ur2
     joint_state_broadcaster_ur2 = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_state_broadcaster", "-c", "/ur2/controller_manager"],
+        arguments=[
+            "joint_state_broadcaster",
+            "-c",
+            "/ur2/controller_manager",
+            "-p",
+            controllers_ur2,
+        ]
+        + spawner_common,
     )
     scaled_joint_trajectory_ur2 = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["scaled_joint_trajectory_controller", "-c", "/ur2/controller_manager"],
+        arguments=[
+            "scaled_joint_trajectory_controller",
+            "-c",
+            "/ur2/controller_manager",
+            "-p",
+            controllers_ur2,
+        ]
+        + spawner_common,
+    )
+
+    # Forward position controller for servo teleop (spawned inactive, activate when needed)
+    forward_position_ur1 = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["forward_position_controller", "-c", "/ur1/controller_manager", "--inactive"] + spawner_common,
+    )
+    forward_position_ur2 = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["forward_position_controller", "-c", "/ur2/controller_manager", "--inactive"] + spawner_common,
     )
 
     # Clock bridge
@@ -215,19 +268,44 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
-    # Chain: spawn ur1 -> spawn ur2 -> spawn controllers for both
+    # Chain: spawn ur1 -> spawn ur2 -> delay 8s (gz_ros2_control needs time to init) -> spawn controllers sequentially
     delay_spawn_ur2 = RegisterEventHandler(
         event_handler=OnProcessExit(target_action=gz_spawn_ur1, on_exit=[gz_spawn_ur2]),
     )
-    delay_controllers = RegisterEventHandler(
+    delay_then_joint_state_ur1 = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=gz_spawn_ur2,
-            on_exit=[
-                joint_state_broadcaster_ur1,
-                joint_state_broadcaster_ur2,
-                scaled_joint_trajectory_ur1,
-                scaled_joint_trajectory_ur2,
-            ],
+            on_exit=[TimerAction(period=8.0, actions=[joint_state_broadcaster_ur1])],
+        ),
+    )
+    after_joint_state_ur1 = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=joint_state_broadcaster_ur1,
+            on_exit=[joint_state_broadcaster_ur2],
+        ),
+    )
+    after_joint_state_ur2 = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=joint_state_broadcaster_ur2,
+            on_exit=[scaled_joint_trajectory_ur1],
+        ),
+    )
+    after_scaled_ur1 = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=scaled_joint_trajectory_ur1,
+            on_exit=[scaled_joint_trajectory_ur2],
+        ),
+    )
+    after_scaled_ur2 = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=scaled_joint_trajectory_ur2,
+            on_exit=[forward_position_ur1],
+        ),
+    )
+    after_forward_ur1 = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=forward_position_ur1,
+            on_exit=[forward_position_ur2],
         ),
     )
 
@@ -238,7 +316,12 @@ def launch_setup(context, *args, **kwargs):
         robot_state_publisher_ur2,
         gz_spawn_ur1,
         delay_spawn_ur2,
-        delay_controllers,
+        delay_then_joint_state_ur1,
+        after_joint_state_ur1,
+        after_joint_state_ur2,
+        after_scaled_ur1,
+        after_scaled_ur2,
+        after_forward_ur1,
     ]
 
 
