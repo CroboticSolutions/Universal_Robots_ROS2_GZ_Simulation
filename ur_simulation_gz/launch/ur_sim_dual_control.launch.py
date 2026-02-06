@@ -3,30 +3,19 @@
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
 #
-#    * Redistributions of source code must retain the above copyright
+#    * Redistributions of source and binary forms must retain the above copyright
 #      notice, this list of conditions and the following disclaimer.
-#
-#    * Redistributions in binary form must reproduce the above copyright
-#      notice, this list of conditions and the following disclaimer in the
-#      documentation and/or other materials provided with the distribution.
 #
 #    * Neither the name of the {copyright_holder} nor the names of its
 #      contributors may be used to endorse or promote products derived from
-#      this software without specific prior written permission.
+#      this software without prior written permission.
 #
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-# POSSIBILITY OF SUCH DAMAGE.
+# Dual-arm variant: 1 world, N robots with namespaces from robot_names argument.
 #
-# Dual-arm variant: 1 world, 2 robots (ur1, ur2) with namespaces.
+# Usage: ros2 launch ur_simulation_gz ur_sim_dual_control.launch.py robot_names:=ur1,ur2
+
+import sys
+from pathlib import Path
 
 from launch import LaunchDescription
 from launch.actions import (
@@ -44,9 +33,16 @@ from launch.substitutions import (
     LaunchConfiguration,
     PathJoinSubstitution,
     IfElseSubstitution,
+    TextSubstitution,
 )
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+
+from ament_index_python.packages import get_package_share_directory
+
+# Import shared dual-arm utilities
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from dual_arm_utils import get_prefixed_controllers_path
 
 
 def launch_setup(context, *args, **kwargs):
@@ -57,97 +53,89 @@ def launch_setup(context, *args, **kwargs):
     description_file = LaunchConfiguration("description_file")
     gazebo_gui = LaunchConfiguration("gazebo_gui")
     world_file = LaunchConfiguration("world_file")
+    robot_names = LaunchConfiguration("robot_names", default="ur1,ur2")
+    base_positions = LaunchConfiguration("base_positions", default="0 0 0, 1 0 0")
 
-    pkg_share = FindPackageShare("ur_simulation_gz")
-    # Use sim-specific configs (no io_and_status, speed_scaling) to avoid configure failures
-    controllers_ur1 = PathJoinSubstitution([pkg_share, "config", "ur_controllers_sim_ur1.yaml"])
-    controllers_ur2 = PathJoinSubstitution([pkg_share, "config", "ur_controllers_sim_ur2.yaml"])
+    pkg_share = get_package_share_directory("ur_simulation_gz")
 
-    # Robot 1 (ur1) description
-    robot_description_ur1 = Command(
-        [
-            PathJoinSubstitution([FindExecutable(name="xacro")]),
-            " ",
-            description_file,
-            " ",
-            "safety_limits:=",
-            safety_limits,
-            " ",
-            "safety_pos_margin:=",
-            safety_pos_margin,
-            " ",
-            "safety_k_position:=",
-            safety_k_position,
-            " ",
-            "name:=ur1",
-            " ",
-            "ur_type:=",
-            ur_type,
-            " ",
-            "tf_prefix:=ur1_",
-            " ",
-            "ros_namespace:=ur1",
-            " ",
-            "simulation_controllers:=",
-            controllers_ur1,
-        ]
-    )
+    robot_names_val = context.perform_substitution(robot_names)
+    robots = [r.strip() for r in robot_names_val.split(",") if r.strip()]
 
-    # Robot 2 (ur2) description
-    robot_description_ur2 = Command(
-        [
-            PathJoinSubstitution([FindExecutable(name="xacro")]),
-            " ",
-            description_file,
-            " ",
-            "safety_limits:=",
-            safety_limits,
-            " ",
-            "safety_pos_margin:=",
-            safety_pos_margin,
-            " ",
-            "safety_k_position:=",
-            safety_k_position,
-            " ",
-            "name:=ur2",
-            " ",
-            "ur_type:=",
-            ur_type,
-            " ",
-            "tf_prefix:=ur2_",
-            " ",
-            "ros_namespace:=ur2",
-            " ",
-            'base_xyz:="1 0 0"',
-            " ",
-            "simulation_controllers:=",
-            controllers_ur2,
-        ]
-    )
+    base_positions_val = context.perform_substitution(base_positions)
+    positions = [p.strip() for p in base_positions_val.split(",") if p.strip()]
+    while len(positions) < len(robots):
+        positions.append("0 0 0")
 
-    # Robot state publishers (one per namespace); remap tf to global /tf for RViz
-    robot_state_publisher_ur1 = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        namespace="ur1",
-        output="both",
-        parameters=[{"use_sim_time": True}, {"robot_description": robot_description_ur1}],
-        remappings=[
-            ("tf", "/tf"),
-            ("tf_static", "/tf_static"),
-        ],
-    )
-    robot_state_publisher_ur2 = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        namespace="ur2",
-        output="both",
-        parameters=[{"use_sim_time": True}, {"robot_description": robot_description_ur2}],
-        remappings=[
-            ("tf", "/tf"),
-            ("tf_static", "/tf_static"),
-        ],
-    )
+    robot_descriptions = []
+    robot_state_publishers = []
+    gz_spawn_nodes = []
+    controller_paths = []
+
+    for i, name in enumerate(robots):
+        tf_prefix = ""  # No prefix: joint names are elbow_joint, etc.; namespace /ur1 disambiguates
+        base_xyz = positions[i] if i < len(positions) else "0 0 0"
+
+        controllers_path = get_prefixed_controllers_path(pkg_share, tf_prefix)
+        controller_paths.append(controllers_path)
+
+        robot_description = Command(
+            [
+                PathJoinSubstitution([FindExecutable(name="xacro")]),
+                " ",
+                description_file,
+                " ",
+                "safety_limits:=",
+                safety_limits,
+                " ",
+                "safety_pos_margin:=",
+                safety_pos_margin,
+                " ",
+                "safety_k_position:=",
+                safety_k_position,
+                " ",
+                f"name:={name}",
+                " ",
+                "ur_type:=",
+                ur_type,
+                " ",
+                f"tf_prefix:={tf_prefix}",
+                " ",
+                f"ros_namespace:={name}",
+                " ",
+                f'base_xyz:="{base_xyz}"',
+                " ",
+                "simulation_controllers:=",
+                TextSubstitution(text=controllers_path),
+            ]
+        )
+        robot_descriptions.append(robot_description)
+
+        robot_state_publishers.append(
+            Node(
+                package="robot_state_publisher",
+                executable="robot_state_publisher",
+                namespace=name,
+                output="both",
+                parameters=[{"use_sim_time": True}, {"robot_description": robot_description}],
+                # No tf remapping: publishes to /ur1/tf, /ur2/tf (namespaced); TF bridge merges to /tf for RViz
+            )
+        )
+
+        gz_spawn_nodes.append(
+            Node(
+                package="ros_gz_sim",
+                executable="create",
+                output="screen",
+                arguments=[
+                    "-string",
+                    robot_description,
+                    "-name",
+                    name,
+                    "-allow_renaming",
+                    "true",
+                ],
+            )
+        )
 
     # Gazebo launch (single world)
     gz_launch_description = IncludeLaunchDescription(
@@ -163,102 +151,54 @@ def launch_setup(context, *args, **kwargs):
         }.items(),
     )
 
-    # Spawn ur1 (first robot, includes world/ground from xacro)
-    gz_spawn_ur1 = Node(
-        package="ros_gz_sim",
-        executable="create",
-        output="screen",
-        arguments=[
-            "-string",
-            robot_description_ur1,
-            "-name",
-            "ur1",
-            "-allow_renaming",
-            "true",
-        ],
-    )
-
-    # Spawn ur2 (second robot; base_xyz in URDF handles offset, no -x here)
-    gz_spawn_ur2 = Node(
-        package="ros_gz_sim",
-        executable="create",
-        output="screen",
-        arguments=[
-            "-string",
-            robot_description_ur2,
-            "-name",
-            "ur2",
-            "-allow_renaming",
-            "true",
-        ],
-    )
-
-    # Spawner args: longer timeouts for sim startup; sequential spawn avoids race
     spawner_common = ["--controller-manager-timeout", "30", "--switch-timeout", "30"]
 
-    # Controller spawners for ur1 (param-file ensures correct config for configure step)
-    joint_state_broadcaster_ur1 = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[
-            "joint_state_broadcaster",
-            "-c",
-            "/ur1/controller_manager",
-            "-p",
-            controllers_ur1,
-        ]
-        + spawner_common,
-    )
-    scaled_joint_trajectory_ur1 = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[
-            "scaled_joint_trajectory_controller",
-            "-c",
-            "/ur1/controller_manager",
-            "-p",
-            controllers_ur1,
-        ]
-        + spawner_common,
-    )
+    joint_state_broadcasters = []
+    scaled_joint_trajectory_spawners = []
+    forward_position_spawners = []
 
-    # Controller spawners for ur2
-    joint_state_broadcaster_ur2 = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[
-            "joint_state_broadcaster",
-            "-c",
-            "/ur2/controller_manager",
-            "-p",
-            controllers_ur2,
-        ]
-        + spawner_common,
-    )
-    scaled_joint_trajectory_ur2 = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=[
-            "scaled_joint_trajectory_controller",
-            "-c",
-            "/ur2/controller_manager",
-            "-p",
-            controllers_ur2,
-        ]
-        + spawner_common,
-    )
-
-    # Forward position controller for servo teleop (spawned inactive, activate when needed)
-    forward_position_ur1 = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["forward_position_controller", "-c", "/ur1/controller_manager", "--inactive"] + spawner_common,
-    )
-    forward_position_ur2 = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["forward_position_controller", "-c", "/ur2/controller_manager", "--inactive"] + spawner_common,
-    )
+    for i, name in enumerate(robots):
+        joint_state_broadcasters.append(
+            Node(
+                package="controller_manager",
+                executable="spawner",
+                arguments=[
+                    "joint_state_broadcaster",
+                    "-c",
+                    f"/{name}/controller_manager",
+                    "-p",
+                    controller_paths[i],
+                ]
+                + spawner_common,
+            )
+        )
+        scaled_joint_trajectory_spawners.append(
+            Node(
+                package="controller_manager",
+                executable="spawner",
+                arguments=[
+                    "scaled_joint_trajectory_controller",
+                    "-c",
+                    f"/{name}/controller_manager",
+                    "-p",
+                    controller_paths[i],
+                ]
+                + spawner_common,
+            )
+        )
+        forward_position_spawners.append(
+            Node(
+                package="controller_manager",
+                executable="spawner",
+                arguments=[
+                    "forward_position_controller",
+                    "-c",
+                    f"/{name}/controller_manager",
+                    "--inactive",
+                ]
+                + spawner_common,
+            )
+        )
 
     # Clock bridge
     gz_sim_bridge = Node(
@@ -268,61 +208,67 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
-    # Chain: spawn ur1 -> spawn ur2 -> delay 8s (gz_ros2_control needs time to init) -> spawn controllers sequentially
-    delay_spawn_ur2 = RegisterEventHandler(
-        event_handler=OnProcessExit(target_action=gz_spawn_ur1, on_exit=[gz_spawn_ur2]),
-    )
-    delay_then_joint_state_ur1 = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=gz_spawn_ur2,
-            on_exit=[TimerAction(period=8.0, actions=[joint_state_broadcaster_ur1])],
-        ),
-    )
-    after_joint_state_ur1 = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=joint_state_broadcaster_ur1,
-            on_exit=[joint_state_broadcaster_ur2],
-        ),
-    )
-    after_joint_state_ur2 = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=joint_state_broadcaster_ur2,
-            on_exit=[scaled_joint_trajectory_ur1],
-        ),
-    )
-    after_scaled_ur1 = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=scaled_joint_trajectory_ur1,
-            on_exit=[scaled_joint_trajectory_ur2],
-        ),
-    )
-    after_scaled_ur2 = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=scaled_joint_trajectory_ur2,
-            on_exit=[forward_position_ur1],
-        ),
-    )
-    after_forward_ur1 = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=forward_position_ur1,
-            on_exit=[forward_position_ur2],
-        ),
+    # TF bridge: merges /ur1/tf, /ur2/tf to /tf with frame prefixes for RViz
+    tf_bridge_node = Node(
+        package="ur_simulation_gz",
+        executable="tf_bridge_node.py",
+        name="tf_bridge",
+        output="log",
+        parameters=[
+            {"use_sim_time": True},
+            {"robot_names": robot_names_val},
+            {"base_positions": base_positions_val},
+        ],
+        arguments=[
+            f"robot_names:={robot_names_val}",
+            f'base_positions:="{base_positions_val}"',
+        ],
     )
 
-    return [
-        gz_launch_description,
-        gz_sim_bridge,
-        robot_state_publisher_ur1,
-        robot_state_publisher_ur2,
-        gz_spawn_ur1,
-        delay_spawn_ur2,
-        delay_then_joint_state_ur1,
-        after_joint_state_ur1,
-        after_joint_state_ur2,
-        after_scaled_ur1,
-        after_scaled_ur2,
-        after_forward_ur1,
-    ]
+    # Chain: spawn robot 0 -> spawn robot 1 -> ... -> delay 8s -> joint_state 0 -> ... -> scaled 0 -> ... -> forward 0 -> ...
+    actions = [gz_launch_description, gz_sim_bridge, tf_bridge_node] + robot_state_publishers + [gz_spawn_nodes[0]]
+
+    prev_spawn = gz_spawn_nodes[0]
+    for i in range(1, len(gz_spawn_nodes)):
+        delay_spawn = RegisterEventHandler(
+            event_handler=OnProcessExit(target_action=prev_spawn, on_exit=[gz_spawn_nodes[i]])
+        )
+        actions.append(delay_spawn)
+        prev_spawn = gz_spawn_nodes[i]
+
+    delay_then_joint_state = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=prev_spawn,
+            on_exit=[TimerAction(period=8.0, actions=[joint_state_broadcasters[0]])],
+        ),
+    )
+    actions.append(delay_then_joint_state)
+
+    prev_action = joint_state_broadcasters[0]
+    for i in range(1, len(joint_state_broadcasters)):
+        after = RegisterEventHandler(
+            event_handler=OnProcessExit(target_action=prev_action, on_exit=[joint_state_broadcasters[i]])
+        )
+        actions.append(after)
+        prev_action = joint_state_broadcasters[i]
+
+    prev_action = joint_state_broadcasters[-1]
+    for i in range(len(scaled_joint_trajectory_spawners)):
+        after = RegisterEventHandler(
+            event_handler=OnProcessExit(target_action=prev_action, on_exit=[scaled_joint_trajectory_spawners[i]])
+        )
+        actions.append(after)
+        prev_action = scaled_joint_trajectory_spawners[i]
+
+    prev_action = scaled_joint_trajectory_spawners[-1]
+    for i in range(len(forward_position_spawners)):
+        after = RegisterEventHandler(
+            event_handler=OnProcessExit(target_action=prev_action, on_exit=[forward_position_spawners[i]])
+        )
+        actions.append(after)
+        prev_action = forward_position_spawners[i]
+
+    return actions
 
 
 def generate_launch_description():
@@ -347,6 +293,16 @@ def generate_launch_description():
                 "ur30",
             ],
             default_value="ur5e",
+        ),
+        DeclareLaunchArgument(
+            "robot_names",
+            default_value="ur1,ur2",
+            description="Comma-separated robot names (namespace + tf_prefix base).",
+        ),
+        DeclareLaunchArgument(
+            "base_positions",
+            default_value="0 0 0, 1 0 0",
+            description="Comma-separated base xyz positions for each robot (e.g. '0 0 0, 1 0 0').",
         ),
         DeclareLaunchArgument(
             "safety_limits",

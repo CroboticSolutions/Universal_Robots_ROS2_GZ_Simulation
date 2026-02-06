@@ -13,6 +13,9 @@ option(
 install(DIRECTORY config launch urdf srdf
   DESTINATION share/${PROJECT_NAME}
 )
+install(PROGRAMS scripts/tf_bridge_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 if(BUILD_TESTING)
   find_package(launch_testing_ament_cmake)

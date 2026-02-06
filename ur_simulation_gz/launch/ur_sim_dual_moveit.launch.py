@@ -41,6 +41,8 @@ def launch_setup(context, *args, **kwargs):
     description_file = LaunchConfiguration("description_file")
     gazebo_gui = LaunchConfiguration("gazebo_gui")
     world_file = LaunchConfiguration("world_file")
+    robot_names = LaunchConfiguration("robot_names", default="ur1,ur2")
+    base_positions = LaunchConfiguration("base_positions", default="0 0 0, 1 0 0")
 
     ur_dual_control_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -53,6 +55,8 @@ def launch_setup(context, *args, **kwargs):
             "description_file": description_file,
             "gazebo_gui": gazebo_gui,
             "world_file": world_file,
+            "robot_names": robot_names,
+            "base_positions": base_positions,
         }.items(),
     )
 
@@ -65,6 +69,8 @@ def launch_setup(context, *args, **kwargs):
         launch_arguments={
             "ur_type": ur_type,
             "use_sim_time": "true",
+            "robot_names": robot_names,
+            "base_positions": base_positions,
         }.items(),
     )
 
@@ -113,6 +119,16 @@ def generate_launch_description():
             "world_file",
             default_value="empty.sdf",
             description="Gazebo world file.",
+        ),
+        DeclareLaunchArgument(
+            "robot_names",
+            default_value="ur1,ur2",
+            description="Comma-separated robot names (namespace + tf_prefix base).",
+        ),
+        DeclareLaunchArgument(
+            "base_positions",
+            default_value="0 0 0, 1 0 0",
+            description="Comma-separated base xyz positions for each robot.",
         ),
     ]
 
