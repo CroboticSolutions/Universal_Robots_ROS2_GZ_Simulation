@@ -13,7 +13,7 @@ option(
 install(DIRECTORY config launch urdf srdf
   DESTINATION share/${PROJECT_NAME}
 )
-install(PROGRAMS scripts/tf_bridge_node.py
+install(PROGRAMS scripts/tf_bridge_node.py scripts/gripper_command_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

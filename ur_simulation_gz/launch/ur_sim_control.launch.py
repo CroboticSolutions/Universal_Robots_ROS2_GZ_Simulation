@@ -46,6 +46,7 @@ from launch.substitutions import (
     IfElseSubstitution,
 )
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -57,6 +58,7 @@ def launch_setup(context, *args, **kwargs):
     safety_k_position = LaunchConfiguration("safety_k_position")
     # General arguments
     controllers_file = LaunchConfiguration("controllers_file")
+    use_gripper = LaunchConfiguration("use_gripper")
     tf_prefix = LaunchConfiguration("tf_prefix")
     activate_joint_controller = LaunchConfiguration("activate_joint_controller")
     initial_joint_controller = LaunchConfiguration("initial_joint_controller")
@@ -94,7 +96,9 @@ def launch_setup(context, *args, **kwargs):
             controllers_file,
         ]
     )
-    robot_description = {"robot_description": robot_description_content}
+    robot_description = {
+        "robot_description": ParameterValue(robot_description_content, value_type=str)
+    }
 
     robot_state_publisher_node = Node(
         package="robot_state_publisher",
@@ -141,6 +145,26 @@ def launch_setup(context, *args, **kwargs):
         condition=UnlessCondition(activate_joint_controller),
     )
 
+    gripper_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["gripper_controller", "-c", "/controller_manager"],
+        condition=IfCondition(use_gripper),
+    )
+
+    gripper_command_node = Node(
+        package="ur_simulation_gz",
+        executable="gripper_command_node.py",
+        name="gripper_command_node",
+        output="log",
+        parameters=[{"use_sim_time": True}],
+        remappings=[
+            ("gripper_position_goal", "/gripper_position_goal"),
+            ("gripper_controller/commands", "/gripper_controller/commands"),
+        ],
+        condition=IfCondition(use_gripper),
+    )
+
     # GZ nodes
     gz_spawn_entity = Node(
         package="ros_gz_sim",
@@ -156,6 +180,7 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
+    # Bullet-featherstone physics supports mimic joints (required for Robotiq 2F-85)
     gz_launch_description = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [FindPackageShare("ros_gz_sim"), "/launch/gz_sim.launch.py"]
@@ -163,8 +188,14 @@ def launch_setup(context, *args, **kwargs):
         launch_arguments={
             "gz_args": IfElseSubstitution(
                 gazebo_gui,
-                if_value=[" -r -v 4 ", world_file],
-                else_value=[" -s -r -v 4 ", world_file],
+                if_value=[
+                    " -r -v 4 --physics-engine gz-physics-bullet-featherstone-plugin ",
+                    world_file,
+                ],
+                else_value=[
+                    " -s -r -v 4 --physics-engine gz-physics-bullet-featherstone-plugin ",
+                    world_file,
+                ],
             )
         }.items(),
     )
@@ -185,6 +216,8 @@ def launch_setup(context, *args, **kwargs):
         delay_rviz_after_joint_state_broadcaster_spawner,
         initial_joint_controller_spawner_stopped,
         initial_joint_controller_spawner_started,
+        gripper_controller_spawner,
+        gripper_command_node,
         gz_spawn_entity,
         gz_launch_description,
         gz_sim_bridge,
@@ -248,6 +281,13 @@ def generate_launch_description():
                 [FindPackageShare("ur_simulation_gz"), "config", "ur_controllers.yaml"]
             ),
             description="Absolute path to YAML file with the controllers configuration.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "use_gripper",
+            default_value="false",
+            description="Launch UR robot with gripper (requires gripper description and controllers).",
         )
     )
     declared_arguments.append(
