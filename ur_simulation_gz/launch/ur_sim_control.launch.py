@@ -152,6 +152,15 @@ def launch_setup(context, *args, **kwargs):
         condition=IfCondition(use_gripper),
     )
 
+    # forward_position_controller for MoveIt Servo (arm_api2 SERVO_CTL mode)
+    # Loaded stopped; arm_api2 activates it when switching to servo
+    forward_position_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["forward_position_controller", "-c", "/controller_manager", "--inactive"],
+        condition=IfCondition(use_gripper),
+    )
+
     gripper_command_node = Node(
         package="ur_simulation_gz",
         executable="gripper_command_node.py",
@@ -217,6 +226,7 @@ def launch_setup(context, *args, **kwargs):
         initial_joint_controller_spawner_stopped,
         initial_joint_controller_spawner_started,
         gripper_controller_spawner,
+        forward_position_spawner,
         gripper_command_node,
         gz_spawn_entity,
         gz_launch_description,
