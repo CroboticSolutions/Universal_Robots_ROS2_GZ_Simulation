@@ -117,7 +117,10 @@ def launch_setup(context, *args, **kwargs):
                 namespace=name,
                 output="both",
                 parameters=[{"use_sim_time": True}, {"robot_description": robot_description}],
-                # No tf remapping: publishes to /ur1/tf, /ur2/tf (namespaced); TF bridge merges to /tf for RViz
+                remappings=[
+                    ("/tf", "tf"),
+                    ("/tf_static", "tf_static"),
+                ],
             )
         )
 

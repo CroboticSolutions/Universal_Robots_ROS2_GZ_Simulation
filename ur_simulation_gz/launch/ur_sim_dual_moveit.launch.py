@@ -127,7 +127,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "base_positions",
-            default_value="0 0 0, 1 0 0",
+            default_value="0 0 0, 0 1 0",
             description="Comma-separated base xyz positions for each robot.",
         ),
     ]

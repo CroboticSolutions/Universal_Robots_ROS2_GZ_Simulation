@@ -10,7 +10,14 @@ import sys
 import rclpy
 from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 from tf2_msgs.msg import TFMessage
+
+TF_STATIC_QOS = QoSProfile(
+    depth=10,
+    durability=DurabilityPolicy.TRANSIENT_LOCAL,
+    reliability=ReliabilityPolicy.RELIABLE,
+)
 
 
 class TFBridgeNode(Node):
@@ -37,26 +44,24 @@ class TFBridgeNode(Node):
                 self.base_positions.append((0.0, 0.0, 0.0))
 
         self.broadcaster = self.create_publisher(TFMessage, "/tf", 10)
-        self.static_broadcaster = self.create_publisher(TFMessage, "/tf_static", 10)
+        self.static_broadcaster = self.create_publisher(
+            TFMessage, "/tf_static", TF_STATIC_QOS
+        )
 
-        self.subscriptions = []
         for i, name in enumerate(self.robots):
             prefix = name + "_"
-            sub = self.create_subscription(
+            self.create_subscription(
                 TFMessage,
                 f"/{name}/tf",
                 lambda msg, p=prefix: self.tf_callback(msg, p),
                 10,
             )
-            self.subscriptions.append(sub)
-
-            sub_static = self.create_subscription(
+            self.create_subscription(
                 TFMessage,
                 f"/{name}/tf_static",
                 lambda msg, p=prefix: self.tf_static_callback(msg, p),
-                10,
+                TF_STATIC_QOS,
             )
-            self.subscriptions.append(sub_static)
 
         self.static_published = False
         self.static_timer = self.create_timer(1.0, self.publish_static_transforms)
