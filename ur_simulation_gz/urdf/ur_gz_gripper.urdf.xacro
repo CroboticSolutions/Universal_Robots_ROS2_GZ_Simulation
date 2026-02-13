@@ -79,13 +79,20 @@
     <origin xyz="0 0 0" rpy="0 0 0" />
   </xacro:robotiq_gripper>
 
-  <!-- High damping on Robotiq joints to prevent self-oscillation in simulation.
-       Reference must be joint name (not link) for correct SDF conversion. -->
+  <!-- High damping on Robotiq joints to prevent self-oscillation in simulation. -->
   <gazebo reference="$(arg tf_prefix)robotiq_85_left_knuckle_joint">
     <dynamics damping="2.0" friction="0.1"/>
   </gazebo>
   <gazebo reference="$(arg tf_prefix)robotiq_85_right_knuckle_joint">
     <dynamics damping="2.0" friction="0.1"/>
+  </gazebo>
+
+  <!-- Like Piper: selfCollide false on gripper finger links (no explicit mu1/mu2). -->
+  <gazebo reference="$(arg tf_prefix)robotiq_85_left_finger_tip_link">
+    <selfCollide>false</selfCollide>
+  </gazebo>
+  <gazebo reference="$(arg tf_prefix)robotiq_85_right_finger_tip_link">
+    <selfCollide>false</selfCollide>
   </gazebo>
 
   <gazebo reference="world">

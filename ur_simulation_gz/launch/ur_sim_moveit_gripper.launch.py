@@ -42,6 +42,7 @@ def launch_setup(context, *args, **kwargs):
     controllers_file = LaunchConfiguration("controllers_file")
     description_file = LaunchConfiguration("description_file")
     moveit_launch_file = LaunchConfiguration("moveit_launch_file")
+    world_file = LaunchConfiguration("world_file")
 
     ur_control_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -56,6 +57,7 @@ def launch_setup(context, *args, **kwargs):
             "description_file": description_file,
             "use_gripper": "true",
             "launch_rviz": "false",
+            "world_file": world_file,
         }.items(),
     )
 
@@ -137,6 +139,15 @@ def generate_launch_description():
                 ]
             ),
             description="MoveIt launch file with Robotiq gripper SRDF.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "world_file",
+            default_value=PathJoinSubstitution(
+                [FindPackageShare("ur_simulation_gz"), "worlds", "empty_with_coke.sdf"]
+            ),
+            description="World SDF with Coke model included (used when launching gripper).",
         )
     )
 

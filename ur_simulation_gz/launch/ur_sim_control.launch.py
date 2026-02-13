@@ -34,6 +34,7 @@ from launch.actions import (
     IncludeLaunchDescription,
     OpaqueFunction,
     RegisterEventHandler,
+    SetEnvironmentVariable,
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
@@ -189,7 +190,7 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    # Bullet-featherstone physics supports mimic joints (required for Robotiq 2F-85)
+    # Gazebo Sim: same as Piper (no --physics-engine, use default)
     gz_launch_description = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [FindPackageShare("ros_gz_sim"), "/launch/gz_sim.launch.py"]
@@ -197,14 +198,8 @@ def launch_setup(context, *args, **kwargs):
         launch_arguments={
             "gz_args": IfElseSubstitution(
                 gazebo_gui,
-                if_value=[
-                    " -r -v 4 --physics-engine gz-physics-bullet-featherstone-plugin ",
-                    world_file,
-                ],
-                else_value=[
-                    " -s -r -v 4 --physics-engine gz-physics-bullet-featherstone-plugin ",
-                    world_file,
-                ],
+                if_value=[" -r -v 4 ", world_file],
+                else_value=[" -s -r -v 4 ", world_file],
             )
         }.items(),
     )
@@ -219,7 +214,18 @@ def launch_setup(context, *args, **kwargs):
         output="screen",
     )
 
+    # Obavezno: da world može učitati model://Coke (include u empty_with_coke.sdf)
+    set_gz_resource_path = SetEnvironmentVariable(
+        name="GZ_SIM_RESOURCE_PATH",
+        value=PathJoinSubstitution([
+            FindPackageShare("ur_simulation_gz"), "model"
+        ]),
+    )
+
     nodes_to_start = [
+        set_gz_resource_path,
+        gz_launch_description,
+        gz_sim_bridge,
         robot_state_publisher_node,
         joint_state_broadcaster_spawner,
         delay_rviz_after_joint_state_broadcaster_spawner,
@@ -229,8 +235,6 @@ def launch_setup(context, *args, **kwargs):
         forward_position_spawner,
         gripper_command_node,
         gz_spawn_entity,
-        gz_launch_description,
-        gz_sim_bridge,
     ]
 
     return nodes_to_start

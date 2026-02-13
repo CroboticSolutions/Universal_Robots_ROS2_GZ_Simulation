@@ -10,7 +10,7 @@ option(
   OFF
 )
 
-install(DIRECTORY config launch urdf srdf
+install(DIRECTORY config launch urdf srdf model worlds
   DESTINATION share/${PROJECT_NAME}
 )
 install(PROGRAMS scripts/tf_bridge_node.py scripts/gripper_command_node.py
