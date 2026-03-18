@@ -6,7 +6,7 @@ import yaml
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription, OpaqueFunction, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
@@ -28,6 +28,16 @@ def _parse_robot_count(value: str) -> int:
         raise ValueError(f"robot_count must be an integer, got: {value!r}") from exc
     if parsed < 1 or parsed > 16:
         raise ValueError(f"robot_count must be in range [1, 16], got: {parsed}")
+    return parsed
+
+
+def _parse_nonnegative_float(value: str, field_name: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must be a float, got: {value!r}") from exc
+    if not math.isfinite(parsed) or parsed < 0.0:
+        raise ValueError(f"{field_name} must be a non-negative finite float, got: {parsed!r}")
     return parsed
 
 
@@ -212,6 +222,24 @@ def launch_setup(context, *args, **kwargs):
             LaunchConfiguration("moveit_launch_file").perform(context),
         )
     )
+    per_robot_start_delay_s = _parse_nonnegative_float(
+        str(
+            profile.get(
+                "per_robot_start_delay_s",
+                LaunchConfiguration("per_robot_start_delay_s").perform(context),
+            )
+        ),
+        "per_robot_start_delay_s",
+    )
+    moveit_start_delay_s = _parse_nonnegative_float(
+        str(
+            profile.get(
+                "moveit_start_delay_s",
+                LaunchConfiguration("moveit_start_delay_s").perform(context),
+            )
+        ),
+        "moveit_start_delay_s",
+    )
 
     robot_count = _parse_optional_robot_count(profile.get("robot_count"))
     if robot_count is None:
@@ -232,47 +260,51 @@ def launch_setup(context, *args, **kwargs):
         launch_rviz = "true" if launch_rviz_first_robot and index == 0 else "false"
         warehouse_sqlite_path = f"{warehouse_sqlite_base}_{robot_namespace}.sqlite"
 
+        control_include = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(control_launch_path),
+            launch_arguments={
+                "ur_type": ur_type,
+                "safety_limits": safety_limits,
+                "safety_pos_margin": safety_pos_margin,
+                "safety_k_position": safety_k_position,
+                "controllers_file": controllers_file,
+                "description_file": description_file,
+                "activate_joint_controller": activate_joint_controller,
+                "initial_joint_controller": initial_joint_controller,
+                "gazebo_gui": gazebo_gui,
+                "world_file": world_file,
+                "launch_gz_world": launch_world,
+                "launch_rviz": "false",
+                "robot_namespace": robot_namespace,
+                "robot_name": robot_namespace,
+                "robot_model_name": "ur",
+                "spawn_x": str(x),
+                "spawn_y": str(y),
+                "spawn_z": str(z),
+                "spawn_yaw": str(yaw),
+            }.items(),
+        )
+        moveit_include = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(moveit_launch_file),
+            launch_arguments={
+                "ur_type": ur_type,
+                "use_sim_time": "true",
+                "launch_rviz": launch_rviz,
+                "launch_servo": launch_servo,
+                "publish_robot_description_semantic": publish_robot_description_semantic,
+                "robot_namespace": robot_namespace,
+                "robot_description_topic": "robot_description",
+                "robot_model_name": "ur",
+                "warehouse_sqlite_path": warehouse_sqlite_path,
+            }.items(),
+        )
+
+        start_offset = float(index) * per_robot_start_delay_s
         robot_group = GroupAction(
             scoped=True,
             actions=[
-                IncludeLaunchDescription(
-                    PythonLaunchDescriptionSource(control_launch_path),
-                    launch_arguments={
-                        "ur_type": ur_type,
-                        "safety_limits": safety_limits,
-                        "safety_pos_margin": safety_pos_margin,
-                        "safety_k_position": safety_k_position,
-                        "controllers_file": controllers_file,
-                        "description_file": description_file,
-                        "activate_joint_controller": activate_joint_controller,
-                        "initial_joint_controller": initial_joint_controller,
-                        "gazebo_gui": gazebo_gui,
-                        "world_file": world_file,
-                        "launch_gz_world": launch_world,
-                        "launch_rviz": "false",
-                        "robot_namespace": robot_namespace,
-                        "robot_name": robot_namespace,
-                        "robot_model_name": "ur",
-                        "spawn_x": str(x),
-                        "spawn_y": str(y),
-                        "spawn_z": str(z),
-                        "spawn_yaw": str(yaw),
-                    }.items(),
-                ),
-                IncludeLaunchDescription(
-                    PythonLaunchDescriptionSource(moveit_launch_file),
-                    launch_arguments={
-                        "ur_type": ur_type,
-                        "use_sim_time": "true",
-                        "launch_rviz": launch_rviz,
-                        "launch_servo": launch_servo,
-                        "publish_robot_description_semantic": publish_robot_description_semantic,
-                        "robot_namespace": robot_namespace,
-                        "robot_description_topic": "robot_description",
-                        "robot_model_name": "ur",
-                        "warehouse_sqlite_path": warehouse_sqlite_path,
-                    }.items(),
-                ),
+                TimerAction(period=start_offset, actions=[control_include]),
+                TimerAction(period=start_offset + moveit_start_delay_s, actions=[moveit_include]),
             ],
         )
 
@@ -288,6 +320,16 @@ def generate_launch_description():
                 "robots_profile",
                 default_value="default",
                 description="Multi-robot profile name. Supported: default, lab, stress10.",
+            ),
+            DeclareLaunchArgument(
+                "per_robot_start_delay_s",
+                default_value="0.75",
+                description="Delay in seconds between starting each robot stack.",
+            ),
+            DeclareLaunchArgument(
+                "moveit_start_delay_s",
+                default_value="2.0",
+                description="Additional delay after control stack start before MoveIt launch.",
             ),
             DeclareLaunchArgument(
                 "ur_type",

@@ -134,6 +134,9 @@ ros2 launch ur_simulation_gz multi_ur_sim_moveit.launch.py \
 - Profiles are stored in `ur_simulation_gz/config/multi_ur/*.yaml`.
 - Each profile YAML defines `robot_positions` as a list of objects with `x`, `y`, `z`, `yaw` (radians).
 - Optional profile keys include: `ur_type`, `world_file`, `gazebo_gui`, `robot_namespace_prefix`, `launch_rviz_first_robot`.
+- Launch supports startup staggering to reduce DDS/process spikes on large swarms:
+  - `per_robot_start_delay_s`: delay between each robot stack start.
+  - `moveit_start_delay_s`: extra delay before each robot's MoveIt stack starts.
 
 ### Common checks
 
