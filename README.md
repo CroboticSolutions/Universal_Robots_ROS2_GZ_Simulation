@@ -106,24 +106,34 @@ Example using MoveIt with simulated robot:
 ros2 launch ur_simulation_gz ur_sim_moveit.launch.py
 ```
 
-## Multi-robot launch (parametric)
+## Multi-robot launch (profile-based)
 
 You can launch multiple UR robots in one Gazebo world with namespaced control + MoveIt stacks.
 
 ```
-ros2 launch ur_simulation_gz multi_ur_sim_moveit.launch.py \
-  robot_count:=2 \
-  robot_positions:="0,0,0,0;1.5,0,0,1.57" \
-  ur_type:=ur5e
+ros2 launch ur_simulation_gz multi_ur_sim_moveit.launch.py
 ```
 
-### Multi-robot parameters
+Select a profile explicitly:
 
-- `robot_count`: Number of robots (valid range `1..16`).
-- `robot_positions`: Semicolon-separated robot poses in format `x,y,z,yaw` where `yaw` is in **radians**.
-  - Example for 3 robots: `"0,0,0,0;1.5,0,0,1.57;3.0,0,0,0"`.
-- `robot_namespace_prefix`: Prefix used for generated namespaces (`ur1`, `ur2`, ... by default).
-- `launch_rviz_first_robot`: Launch RViz only for first robot namespace (default `true`).
+```
+ros2 launch ur_simulation_gz multi_ur_sim_moveit.launch.py \
+  robots_profile:=lab
+```
+
+Stress profile (10 robots):
+
+```
+ros2 launch ur_simulation_gz multi_ur_sim_moveit.launch.py \
+  robots_profile:=stress10
+```
+
+### Multi-robot profile argument
+
+- `robots_profile`: Multi-robot profile name. Supported values: `default`, `lab`, `stress10`.
+- Profiles are stored in `ur_simulation_gz/config/multi_ur/*.yaml`.
+- Each profile YAML defines `robot_positions` as a list of objects with `x`, `y`, `z`, `yaw` (radians).
+- Optional profile keys include: `ur_type`, `world_file`, `gazebo_gui`, `robot_namespace_prefix`, `launch_rviz_first_robot`.
 
 ### Common checks
 
@@ -142,11 +152,11 @@ ros2 action list | grep follow_joint_trajectory
 
 ### Troubleshooting
 
-- **`robot_positions` parse failure**  
-  Ensure each robot entry has exactly 4 numeric values: `x,y,z,yaw`.
+- **Profile not found**  
+  Ensure `robots_profile` is one of: `default`, `lab`, `stress10`.
 
-- **Count mismatch**  
-  Number of entries in `robot_positions` must exactly match `robot_count`.
+- **`robot_positions` parse failure**  
+  Ensure each profile entry has numeric `x`, `y`, `z`, `yaw` fields.
 
 - **Namespace errors**  
   Namespace tokens must match `[a-zA-Z][a-zA-Z0-9_]*`.

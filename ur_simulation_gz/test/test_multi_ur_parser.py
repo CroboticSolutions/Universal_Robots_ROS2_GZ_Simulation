@@ -75,3 +75,33 @@ def test_validate_world_file_invalid(world_file):
     module = _load_launch_module()
     with pytest.raises(ValueError):
         module._validate_world_file(world_file)
+
+
+@pytest.mark.parametrize("profile_name", ["default", "lab", "stress10"])
+def test_load_profile_valid(profile_name):
+    module = _load_launch_module()
+    profile = module._load_profile(profile_name)
+    assert isinstance(profile, dict)
+    assert "robot_positions" in profile
+
+
+def test_load_profile_invalid():
+    module = _load_launch_module()
+    with pytest.raises(ValueError):
+        module._load_profile("unknown_profile")
+
+
+def test_parse_profile_positions_valid():
+    module = _load_launch_module()
+    profile_positions = [
+        {"x": 0.0, "y": 0.0, "z": 0.0, "yaw": 0.0},
+        {"x": 1.0, "y": 0.0, "z": 0.0, "yaw": 1.57},
+    ]
+    parsed = module._parse_profile_positions(profile_positions, 2)
+    assert parsed == [(0.0, 0.0, 0.0, 0.0), (1.0, 0.0, 0.0, 1.57)]
+
+
+def test_parse_profile_positions_invalid():
+    module = _load_launch_module()
+    with pytest.raises(ValueError):
+        module._parse_profile_positions([{"x": 0.0, "y": 0.0}], 1)

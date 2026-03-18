@@ -1,6 +1,9 @@
 import math
 import os
 import re
+import yaml
+
+from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription, OpaqueFunction
@@ -11,6 +14,11 @@ from launch_ros.substitutions import FindPackageShare
 
 ROS_NAME_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
 FORBIDDEN_WORLD_CHARS = (";", "|", "&", "$", "`")
+PROFILE_TO_FILE = {
+    "default": "default.yaml",
+    "lab": "lab.yaml",
+    "stress10": "stress10.yaml",
+}
 
 
 def _parse_robot_count(value: str) -> int:
@@ -21,6 +29,12 @@ def _parse_robot_count(value: str) -> int:
     if parsed < 1 or parsed > 16:
         raise ValueError(f"robot_count must be in range [1, 16], got: {parsed}")
     return parsed
+
+
+def _parse_optional_robot_count(value):
+    if value is None:
+        return None
+    return _parse_robot_count(str(value))
 
 
 def _validate_ros_name(value: str, field_name: str) -> str:
@@ -68,37 +82,142 @@ def _parse_positions(positions_raw: str, robot_count: int):
     return parsed
 
 
-def launch_setup(context, *args, **kwargs):
-    ur_type = LaunchConfiguration("ur_type").perform(context)
-    safety_limits = LaunchConfiguration("safety_limits").perform(context)
-    safety_pos_margin = LaunchConfiguration("safety_pos_margin").perform(context)
-    safety_k_position = LaunchConfiguration("safety_k_position").perform(context)
-    controllers_file = LaunchConfiguration("controllers_file").perform(context)
-    description_file = LaunchConfiguration("description_file").perform(context)
-    activate_joint_controller = LaunchConfiguration("activate_joint_controller").perform(context)
-    initial_joint_controller = LaunchConfiguration("initial_joint_controller").perform(context)
-    gazebo_gui = LaunchConfiguration("gazebo_gui").perform(context)
-    world_file = _validate_world_file(LaunchConfiguration("world_file").perform(context))
+def _parse_profile_positions(positions_raw, robot_count: int):
+    if not isinstance(positions_raw, list) or len(positions_raw) == 0:
+        raise ValueError(
+            "robot_positions in profile must be a non-empty list of entries "
+            "with x, y, z, yaw fields."
+        )
+    if len(positions_raw) != robot_count:
+        raise ValueError(
+            "robot_positions in profile must contain exactly "
+            f"{robot_count} entries, got: {len(positions_raw)}"
+        )
+    parsed = []
+    for idx, entry in enumerate(positions_raw, start=1):
+        if not isinstance(entry, dict):
+            raise ValueError(
+                f"robot_positions entry {idx} must be an object with x, y, z, yaw."
+            )
+        missing = [key for key in ("x", "y", "z", "yaw") if key not in entry]
+        if missing:
+            raise ValueError(
+                f"robot_positions entry {idx} is missing required keys: {missing}"
+            )
+        try:
+            x = float(entry["x"])
+            y = float(entry["y"])
+            z = float(entry["z"])
+            yaw = float(entry["yaw"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"robot_positions entry {idx} contains non-numeric values: {entry!r}"
+            ) from exc
+        if not all(math.isfinite(value) for value in (x, y, z, yaw)):
+            raise ValueError(
+                f"robot_positions entry {idx} contains non-finite values: {entry!r}"
+            )
+        parsed.append((x, y, z, yaw))
+    return parsed
 
-    robot_count = _parse_robot_count(LaunchConfiguration("robot_count").perform(context))
-    positions = _parse_positions(
-        LaunchConfiguration("robot_positions").perform(context),
-        robot_count,
+
+def _load_profile(profile_name: str):
+    if profile_name not in PROFILE_TO_FILE:
+        raise ValueError(
+            "robots_profile must be one of "
+            f"{sorted(PROFILE_TO_FILE.keys())}, got: {profile_name!r}"
+        )
+    profile_path = os.path.join(
+        get_package_share_directory("ur_simulation_gz"),
+        "config",
+        "multi_ur",
+        PROFILE_TO_FILE[profile_name],
+    )
+    if not os.path.isfile(profile_path):
+        raise ValueError(f"Profile YAML file not found: {profile_path}")
+    with open(profile_path, "r", encoding="utf-8") as file:
+        data = yaml.safe_load(file) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"Profile YAML must be a mapping/object: {profile_path}")
+    return data
+
+
+def launch_setup(context, *args, **kwargs):
+    robots_profile = LaunchConfiguration("robots_profile").perform(context)
+    profile = _load_profile(robots_profile)
+
+    ur_type = str(profile.get("ur_type", LaunchConfiguration("ur_type").perform(context)))
+    safety_limits = str(
+        profile.get("safety_limits", LaunchConfiguration("safety_limits").perform(context))
+    )
+    safety_pos_margin = str(
+        profile.get("safety_pos_margin", LaunchConfiguration("safety_pos_margin").perform(context))
+    )
+    safety_k_position = str(
+        profile.get("safety_k_position", LaunchConfiguration("safety_k_position").perform(context))
+    )
+    controllers_file = str(
+        profile.get("controllers_file", LaunchConfiguration("controllers_file").perform(context))
+    )
+    description_file = str(
+        profile.get("description_file", LaunchConfiguration("description_file").perform(context))
+    )
+    activate_joint_controller = str(
+        profile.get(
+            "activate_joint_controller",
+            LaunchConfiguration("activate_joint_controller").perform(context),
+        )
+    )
+    initial_joint_controller = str(
+        profile.get(
+            "initial_joint_controller",
+            LaunchConfiguration("initial_joint_controller").perform(context),
+        )
+    )
+    gazebo_gui = str(profile.get("gazebo_gui", LaunchConfiguration("gazebo_gui").perform(context)))
+    world_file = _validate_world_file(
+        str(profile.get("world_file", LaunchConfiguration("world_file").perform(context)))
     )
     namespace_prefix = _validate_ros_name(
-        LaunchConfiguration("robot_namespace_prefix").perform(context),
+        str(
+            profile.get(
+                "robot_namespace_prefix",
+                LaunchConfiguration("robot_namespace_prefix").perform(context),
+            )
+        ),
         "robot_namespace_prefix",
     )
-    launch_rviz_first_robot = (
-        LaunchConfiguration("launch_rviz_first_robot").perform(context).lower() == "true"
+    launch_rviz_first_robot = str(
+        profile.get(
+            "launch_rviz_first_robot",
+            LaunchConfiguration("launch_rviz_first_robot").perform(context),
+        )
+    ).lower() == "true"
+    launch_servo = str(profile.get("launch_servo", LaunchConfiguration("launch_servo").perform(context)))
+    publish_robot_description_semantic = str(
+        profile.get(
+            "publish_robot_description_semantic",
+            LaunchConfiguration("publish_robot_description_semantic").perform(context),
+        )
+    )
+    warehouse_sqlite_base = str(
+        profile.get(
+            "warehouse_sqlite_base",
+            LaunchConfiguration("warehouse_sqlite_base").perform(context),
+        )
+    )
+    moveit_launch_file = str(
+        profile.get(
+            "moveit_launch_file",
+            LaunchConfiguration("moveit_launch_file").perform(context),
+        )
     )
 
-    moveit_launch_file = LaunchConfiguration("moveit_launch_file").perform(context)
-    launch_servo = LaunchConfiguration("launch_servo").perform(context)
-    publish_robot_description_semantic = LaunchConfiguration(
-        "publish_robot_description_semantic"
-    ).perform(context)
-    warehouse_sqlite_base = LaunchConfiguration("warehouse_sqlite_base").perform(context)
+    robot_count = _parse_optional_robot_count(profile.get("robot_count"))
+    if robot_count is None:
+        raw_positions = profile.get("robot_positions", [])
+        robot_count = _parse_robot_count(str(len(raw_positions)))
+    positions = _parse_profile_positions(profile.get("robot_positions"), robot_count)
 
     control_launch_path = PathJoinSubstitution(
         [FindPackageShare("ur_simulation_gz"), "launch", "ur_sim_control.launch.py"]
@@ -166,6 +285,11 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument(
+                "robots_profile",
+                default_value="default",
+                description="Multi-robot profile name. Supported: default, lab, stress10.",
+            ),
+            DeclareLaunchArgument(
                 "ur_type",
                 default_value="ur5e",
                 choices=[
@@ -232,16 +356,6 @@ def generate_launch_description():
                 "world_file",
                 default_value="empty.sdf",
                 description="Gazebo world file (absolute path or world collection filename).",
-            ),
-            DeclareLaunchArgument(
-                "robot_count",
-                default_value="2",
-                description="Number of UR robots to spawn (1..16).",
-            ),
-            DeclareLaunchArgument(
-                "robot_positions",
-                default_value="0,0,0,0;1.5,0,0,1.57",
-                description="Semicolon-separated list of x,y,z,yaw(rad) poses.",
             ),
             DeclareLaunchArgument(
                 "robot_namespace_prefix",

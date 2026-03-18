@@ -1,0 +1,24 @@
+ur_type: ur5e
+gazebo_gui: "true"
+world_file: empty.sdf
+robot_namespace_prefix: ur
+launch_rviz_first_robot: "true"
+launch_servo: "false"
+publish_robot_description_semantic: "true"
+robot_positions:
+  - x: 0.0
+    y: 0.0
+    z: 0.0
+    yaw: 0.0
+  - x: 2.0
+    y: 0.0
+    z: 0.0
+    yaw: 0.0
+  - x: 0.0
+    y: 2.0
+    z: 0.0
+    yaw: 1.57
+  - x: 2.0
+    y: 2.0
+    z: 0.0
+    yaw: 1.57
