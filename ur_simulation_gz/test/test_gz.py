@@ -88,7 +88,7 @@ def generate_test_description():
             "ur_type": "ur5e",
             "launch_rviz": "false",
             "gazebo_gui": "false",
-            "start_joint_controller": "true",
+            "activate_joint_controller": "true",
         }.items(),
     )
     return LaunchDescription([ReadyToTest(), simulator])

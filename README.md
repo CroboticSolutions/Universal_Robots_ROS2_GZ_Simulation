@@ -105,3 +105,55 @@ Example using MoveIt with simulated robot:
 ```
 ros2 launch ur_simulation_gz ur_sim_moveit.launch.py
 ```
+
+## Multi-robot launch (parametric)
+
+You can launch multiple UR robots in one Gazebo world with namespaced control + MoveIt stacks.
+
+```
+ros2 launch ur_simulation_gz multi_ur_sim_moveit.launch.py \
+  robot_count:=2 \
+  robot_positions:="0,0,0,0;1.5,0,0,1.57" \
+  ur_type:=ur5e
+```
+
+### Multi-robot parameters
+
+- `robot_count`: Number of robots (valid range `1..16`).
+- `robot_positions`: Semicolon-separated robot poses in format `x,y,z,yaw` where `yaw` is in **radians**.
+  - Example for 3 robots: `"0,0,0,0;1.5,0,0,1.57;3.0,0,0,0"`.
+- `robot_namespace_prefix`: Prefix used for generated namespaces (`ur1`, `ur2`, ... by default).
+- `launch_rviz_first_robot`: Launch RViz only for first robot namespace (default `true`).
+
+### Common checks
+
+Verify per-robot controllers are reachable:
+
+```
+ros2 control list_controllers -c /ur1/controller_manager
+ros2 control list_controllers -c /ur2/controller_manager
+```
+
+Verify trajectory action endpoints:
+
+```
+ros2 action list | grep follow_joint_trajectory
+```
+
+### Troubleshooting
+
+- **`robot_positions` parse failure**  
+  Ensure each robot entry has exactly 4 numeric values: `x,y,z,yaw`.
+
+- **Count mismatch**  
+  Number of entries in `robot_positions` must exactly match `robot_count`.
+
+- **Namespace errors**  
+  Namespace tokens must match `[a-zA-Z][a-zA-Z0-9_]*`.
+
+- **Controller manager not found**  
+  Use namespaced controller manager path: `-c /<namespace>/controller_manager`.
+
+- **RViz not opening for all robots**  
+  Default behavior opens RViz only for first robot (`launch_rviz_first_robot:=true`).
+  Set `launch_rviz_first_robot:=false` for headless runs.

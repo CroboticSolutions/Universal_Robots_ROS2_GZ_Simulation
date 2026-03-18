@@ -23,8 +23,13 @@ if(BUILD_TESTING)
       TIMEOUT
         180
     )
+    add_launch_test(test/test_multi_ur_launch.py
+      TIMEOUT
+        240
+    )
   endif()
   ament_add_pytest_test(description test/test_description.py)
+  ament_add_pytest_test(multi_ur_parser test/test_multi_ur_parser.py)
 endif()
 
 ament_package()

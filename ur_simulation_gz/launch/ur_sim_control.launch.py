@@ -65,6 +65,20 @@ def launch_setup(context, *args, **kwargs):
     rviz_config_file = LaunchConfiguration("rviz_config_file")
     gazebo_gui = LaunchConfiguration("gazebo_gui")
     world_file = LaunchConfiguration("world_file")
+    launch_gz_world = LaunchConfiguration("launch_gz_world")
+    robot_namespace = LaunchConfiguration("robot_namespace")
+    robot_name = LaunchConfiguration("robot_name")
+    robot_model_name = LaunchConfiguration("robot_model_name")
+    spawn_x = LaunchConfiguration("spawn_x")
+    spawn_y = LaunchConfiguration("spawn_y")
+    spawn_z = LaunchConfiguration("spawn_z")
+    spawn_yaw = LaunchConfiguration("spawn_yaw")
+
+    namespace_value = robot_namespace.perform(context).strip("/")
+    if namespace_value:
+        controller_manager = f"/{namespace_value}/controller_manager"
+    else:
+        controller_manager = "/controller_manager"
 
     robot_description_content = Command(
         [
@@ -82,7 +96,7 @@ def launch_setup(context, *args, **kwargs):
             safety_k_position,
             " ",
             "name:=",
-            "ur",
+            robot_model_name,
             " ",
             "ur_type:=",
             ur_type,
@@ -92,6 +106,9 @@ def launch_setup(context, *args, **kwargs):
             " ",
             "simulation_controllers:=",
             controllers_file,
+            " ",
+            "ros_namespace:=",
+            robot_namespace,
         ]
     )
     robot_description = {"robot_description": robot_description_content}
@@ -100,6 +117,11 @@ def launch_setup(context, *args, **kwargs):
         package="robot_state_publisher",
         executable="robot_state_publisher",
         output="both",
+        namespace=namespace_value,
+        remappings=[
+            ("/tf", "tf"),
+            ("/tf_static", "tf_static"),
+        ],
         parameters=[{"use_sim_time": True}, robot_description],
     )
 
@@ -108,6 +130,7 @@ def launch_setup(context, *args, **kwargs):
         executable="rviz2",
         name="rviz2",
         output="log",
+        namespace=namespace_value,
         arguments=["-d", rviz_config_file],
         condition=IfCondition(launch_rviz),
     )
@@ -115,7 +138,14 @@ def launch_setup(context, *args, **kwargs):
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
+        namespace=namespace_value,
+        arguments=[
+            "joint_state_broadcaster",
+            "--controller-manager",
+            controller_manager,
+            "--param-file",
+            controllers_file,
+        ],
     )
 
     # Delay rviz start after `joint_state_broadcaster`
@@ -131,13 +161,42 @@ def launch_setup(context, *args, **kwargs):
     initial_joint_controller_spawner_started = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=[initial_joint_controller, "-c", "/controller_manager"],
+        namespace=namespace_value,
+        arguments=[
+            initial_joint_controller,
+            "-c",
+            controller_manager,
+            "--param-file",
+            controllers_file,
+        ],
         condition=IfCondition(activate_joint_controller),
     )
     initial_joint_controller_spawner_stopped = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=[initial_joint_controller, "-c", "/controller_manager", "--stopped"],
+        namespace=namespace_value,
+        arguments=[
+            initial_joint_controller,
+            "-c",
+            controller_manager,
+            "--stopped",
+            "--param-file",
+            controllers_file,
+        ],
+        condition=UnlessCondition(activate_joint_controller),
+    )
+    delay_active_controller_after_joint_state = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=joint_state_broadcaster_spawner,
+            on_exit=[initial_joint_controller_spawner_started],
+        ),
+        condition=IfCondition(activate_joint_controller),
+    )
+    delay_inactive_controller_after_joint_state = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=joint_state_broadcaster_spawner,
+            on_exit=[initial_joint_controller_spawner_stopped],
+        ),
         condition=UnlessCondition(activate_joint_controller),
     )
 
@@ -150,9 +209,17 @@ def launch_setup(context, *args, **kwargs):
             "-string",
             robot_description_content,
             "-name",
-            "ur",
+            robot_name,
+            "-x",
+            spawn_x,
+            "-y",
+            spawn_y,
+            "-z",
+            spawn_z,
+            "-Y",
+            spawn_yaw,
             "-allow_renaming",
-            "true",
+            "false",
         ],
     )
 
@@ -167,6 +234,7 @@ def launch_setup(context, *args, **kwargs):
                 else_value=[" -s -r -v 4 ", world_file],
             )
         }.items(),
+        condition=IfCondition(launch_gz_world),
     )
 
     # Make the /clock topic available in ROS
@@ -177,14 +245,15 @@ def launch_setup(context, *args, **kwargs):
             "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
         ],
         output="screen",
+        condition=IfCondition(launch_gz_world),
     )
 
     nodes_to_start = [
         robot_state_publisher_node,
         joint_state_broadcaster_spawner,
         delay_rviz_after_joint_state_broadcaster_spawner,
-        initial_joint_controller_spawner_stopped,
-        initial_joint_controller_spawner_started,
+        delay_active_controller_after_joint_state,
+        delay_inactive_controller_after_joint_state,
         gz_spawn_entity,
         gz_launch_description,
         gz_sim_bridge,
@@ -304,6 +373,50 @@ def generate_launch_description():
             "world_file",
             default_value="empty.sdf",
             description="Gazebo world file (absolute path or filename from the gazebosim worlds collection) containing a custom world.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "robot_namespace",
+            default_value="",
+            description="ROS namespace for this robot instance (e.g. ur1). Empty string keeps root namespace.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "robot_name",
+            default_value="ur",
+            description="Gazebo entity and robot name for this robot instance.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "robot_model_name",
+            default_value="ur",
+            description="Robot model name passed to xacro/MoveIt semantics.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument("spawn_x", default_value="0.0", description="Spawn position X (m).")
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument("spawn_y", default_value="0.0", description="Spawn position Y (m).")
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument("spawn_z", default_value="0.0", description="Spawn position Z (m).")
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "spawn_yaw",
+            default_value="0.0",
+            description="Spawn yaw rotation in radians.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "launch_gz_world",
+            default_value="true",
+            description="Start Gazebo world and /clock bridge. Set false for multi-robot composed launches.",
         )
     )
 
