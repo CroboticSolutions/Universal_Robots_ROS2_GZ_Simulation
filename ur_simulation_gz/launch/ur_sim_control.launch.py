@@ -30,6 +30,7 @@
 
 from launch import LaunchDescription
 from launch.actions import (
+    AppendEnvironmentVariable,
     DeclareLaunchArgument,
     IncludeLaunchDescription,
     OpaqueFunction,
@@ -40,12 +41,14 @@ from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     Command,
+    EqualsSubstitution,
     FindExecutable,
     LaunchConfiguration,
     PathJoinSubstitution,
     IfElseSubstitution,
 )
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -66,6 +69,8 @@ def launch_setup(context, *args, **kwargs):
     gazebo_gui = LaunchConfiguration("gazebo_gui")
     world_file = LaunchConfiguration("world_file")
     launch_gz_world = LaunchConfiguration("launch_gz_world")
+    gz_physics_engine = LaunchConfiguration("gz_physics_engine")
+    use_robotiq_gripper = LaunchConfiguration("use_robotiq_gripper")
     robot_namespace = LaunchConfiguration("robot_namespace")
     robot_name = LaunchConfiguration("robot_name")
     robot_model_name = LaunchConfiguration("robot_model_name")
@@ -109,10 +114,11 @@ def launch_setup(context, *args, **kwargs):
             " ",
             "ros_namespace:=",
             robot_namespace,
+            " ",
+            "use_robotiq_gripper:=",
+            use_robotiq_gripper,
         ]
     )
-    robot_description = {"robot_description": robot_description_content}
-
     robot_state_publisher_node = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
@@ -122,7 +128,15 @@ def launch_setup(context, *args, **kwargs):
             ("/tf", "tf"),
             ("/tf_static", "tf_static"),
         ],
-        parameters=[{"use_sim_time": True}, robot_description],
+        parameters=[
+            {"use_sim_time": True},
+            {
+                "robot_description": ParameterValue(
+                    robot_description_content,
+                    value_type=str,
+                )
+            },
+        ],
     )
 
     rviz_node = Node(
@@ -218,6 +232,49 @@ def launch_setup(context, *args, **kwargs):
         condition=UnlessCondition(activate_joint_controller),
     )
 
+    # Spawn gripper only after the arm trajectory spawner finishes. Starting it in parallel with
+    # the arm spawner (both on joint_state_broadcaster exit) is unreliable in multi-robot launch.
+    robotiq_gripper_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        namespace=namespace_value,
+        arguments=[
+            "robotiq_gripper_controller",
+            "-c",
+            controller_manager,
+            "--controller-manager-timeout",
+            "30.0",
+            "--switch-timeout",
+            "30.0",
+            "--service-call-timeout",
+            "30.0",
+            "--param-file",
+            controllers_file,
+        ],
+    )
+    use_robotiq_flag = use_robotiq_gripper.perform(context).lower() == "true"
+    activate_joint_flag = activate_joint_controller.perform(context).lower() == "true"
+    gripper_after_arm_controller_handlers = []
+    if use_robotiq_flag:
+        if activate_joint_flag:
+            gripper_after_arm_controller_handlers.append(
+                RegisterEventHandler(
+                    event_handler=OnProcessExit(
+                        target_action=initial_joint_controller_spawner_started,
+                        on_exit=[robotiq_gripper_spawner],
+                    ),
+                )
+            )
+        else:
+            gripper_after_arm_controller_handlers.append(
+                RegisterEventHandler(
+                    event_handler=OnProcessExit(
+                        target_action=initial_joint_controller_spawner_stopped,
+                        on_exit=[robotiq_gripper_spawner],
+                    ),
+                )
+            )
+
     # GZ nodes
     gz_spawn_entity = Node(
         package="ros_gz_sim",
@@ -248,8 +305,18 @@ def launch_setup(context, *args, **kwargs):
         launch_arguments={
             "gz_args": IfElseSubstitution(
                 gazebo_gui,
-                if_value=[" -r -v 4 ", world_file],
-                else_value=[" -s -r -v 4 ", world_file],
+                if_value=[
+                    " -r -v 4 --physics-engine ",
+                    gz_physics_engine,
+                    " ",
+                    world_file,
+                ],
+                else_value=[
+                    " -s -r -v 4 --physics-engine ",
+                    gz_physics_engine,
+                    " ",
+                    world_file,
+                ],
             )
         }.items(),
         condition=IfCondition(launch_gz_world),
@@ -272,6 +339,7 @@ def launch_setup(context, *args, **kwargs):
         delay_rviz_after_joint_state_broadcaster_spawner,
         delay_active_controller_after_joint_state,
         delay_inactive_controller_after_joint_state,
+        *gripper_after_arm_controller_handlers,
         gz_spawn_entity,
         gz_launch_description,
         gz_sim_bridge,
@@ -395,6 +463,17 @@ def generate_launch_description():
     )
     declared_arguments.append(
         DeclareLaunchArgument(
+            "gz_physics_engine",
+            default_value="gz-physics-bullet-featherstone-plugin",
+            description=(
+                "gz-physics engine plugin passed to `gz sim --physics-engine`. "
+                "Bullet-Featherstone supports URDF mimic constraints (needed for Robotiq finger kinematics). "
+                "Use gz-physics-dartsim-plugin for legacy DART-only behavior."
+            ),
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
             "robot_namespace",
             default_value="",
             description="ROS namespace for this robot instance (e.g. ur1). Empty string keeps root namespace.",
@@ -437,5 +516,39 @@ def generate_launch_description():
             description="Start Gazebo world and /clock bridge. Set false for multi-robot composed launches.",
         )
     )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "use_robotiq_gripper",
+            default_value="false",
+            choices=["true", "false"],
+            description="If true, attach Robotiq 2F-85 (robotiq_description) and spawn robotiq_gripper_controller.",
+        )
+    )
 
-    return LaunchDescription(declared_arguments + [OpaqueFunction(function=launch_setup)])
+    # Gazebo resolves model://robotiq_description/... against GZ_SIM_RESOURCE_PATH.
+    # Parent of share/robotiq_description is .../share so model URI maps to package meshes.
+    robotiq_resource_parent = PathJoinSubstitution(
+        [FindPackageShare("robotiq_description"), ".."]
+    )
+    gripper_env_condition = IfCondition(
+        EqualsSubstitution(LaunchConfiguration("use_robotiq_gripper"), "true")
+    )
+
+    return LaunchDescription(
+        declared_arguments
+        + [
+            AppendEnvironmentVariable(
+                name="GZ_SIM_RESOURCE_PATH",
+                value=robotiq_resource_parent,
+                prepend=True,
+                condition=gripper_env_condition,
+            ),
+            AppendEnvironmentVariable(
+                name="IGN_GAZEBO_RESOURCE_PATH",
+                value=robotiq_resource_parent,
+                prepend=True,
+                condition=gripper_env_condition,
+            ),
+            OpaqueFunction(function=launch_setup),
+        ]
+    )

@@ -17,6 +17,9 @@ FORBIDDEN_WORLD_CHARS = (";", "|", "&", "$", "`")
 PROFILE_TO_FILE = {
     "default": "default.yaml",
     "lab": "lab.yaml",
+    "lab_gripper": "lab_gripper.yaml",
+    "lab_gripper_5": "lab_gripper_5.yaml",
+    "lab_gripper_6": "lab_gripper_6.yaml",
     "stress10": "stress10.yaml",
 }
 
@@ -172,6 +175,13 @@ def launch_setup(context, *args, **kwargs):
     description_file = str(
         profile.get("description_file", LaunchConfiguration("description_file").perform(context))
     )
+    use_robotiq_gripper_raw = str(
+        profile.get(
+            "use_robotiq_gripper",
+            LaunchConfiguration("use_robotiq_gripper").perform(context),
+        )
+    )
+    use_robotiq_gripper = "true" if use_robotiq_gripper_raw.lower() == "true" else "false"
     activate_joint_controller = str(
         profile.get(
             "activate_joint_controller",
@@ -187,6 +197,12 @@ def launch_setup(context, *args, **kwargs):
     gazebo_gui = str(profile.get("gazebo_gui", LaunchConfiguration("gazebo_gui").perform(context)))
     world_file = _validate_world_file(
         str(profile.get("world_file", LaunchConfiguration("world_file").perform(context)))
+    )
+    gz_physics_engine = str(
+        profile.get(
+            "gz_physics_engine",
+            LaunchConfiguration("gz_physics_engine").perform(context),
+        )
     )
     namespace_prefix = _validate_ros_name(
         str(
@@ -220,6 +236,12 @@ def launch_setup(context, *args, **kwargs):
         profile.get(
             "moveit_launch_file",
             LaunchConfiguration("moveit_launch_file").perform(context),
+        )
+    )
+    semantic_description_file = str(
+        profile.get(
+            "semantic_description_file",
+            LaunchConfiguration("semantic_description_file").perform(context),
         )
     )
     per_robot_start_delay_s = _parse_nonnegative_float(
@@ -282,6 +304,8 @@ def launch_setup(context, *args, **kwargs):
                 "spawn_y": str(y),
                 "spawn_z": str(z),
                 "spawn_yaw": str(yaw),
+                "use_robotiq_gripper": use_robotiq_gripper,
+                "gz_physics_engine": gz_physics_engine,
             }.items(),
         )
         moveit_include = IncludeLaunchDescription(
@@ -296,6 +320,7 @@ def launch_setup(context, *args, **kwargs):
                 "robot_description_topic": "robot_description",
                 "robot_model_name": "ur",
                 "warehouse_sqlite_path": warehouse_sqlite_path,
+                "semantic_description_file": semantic_description_file,
             }.items(),
         )
 
@@ -319,7 +344,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "robots_profile",
                 default_value="default",
-                description="Multi-robot profile name. Supported: default, lab, stress10.",
+                description="Multi-robot profile name. Supported: default, lab, lab_gripper, lab_gripper_5, lab_gripper_6, stress10.",
             ),
             DeclareLaunchArgument(
                 "per_robot_start_delay_s",
@@ -400,6 +425,14 @@ def generate_launch_description():
                 description="Gazebo world file (absolute path or world collection filename).",
             ),
             DeclareLaunchArgument(
+                "gz_physics_engine",
+                default_value="gz-physics-bullet-featherstone-plugin",
+                description=(
+                    "Passed to ur_sim_control / `gz sim --physics-engine`. "
+                    "Bullet-Featherstone supports mimic constraints (Robotiq fingers)."
+                ),
+            ),
+            DeclareLaunchArgument(
                 "robot_namespace_prefix",
                 default_value="ur",
                 description="Prefix used to generate per-robot namespaces (ur1, ur2, ...).",
@@ -430,6 +463,17 @@ def generate_launch_description():
                     [FindPackageShare("ur_moveit_config"), "launch", "ur_moveit.launch.py"]
                 ),
                 description="Absolute path for MoveIt launch file.",
+            ),
+            DeclareLaunchArgument(
+                "use_robotiq_gripper",
+                default_value="false",
+                choices=["true", "false"],
+                description="Forwarded to ur_sim_control when not set in profile YAML.",
+            ),
+            DeclareLaunchArgument(
+                "semantic_description_file",
+                default_value="srdf/ur.srdf.xacro",
+                description="MoveIt SRDF xacro path relative to ur_moveit_config (override via profile YAML).",
             ),
             OpaqueFunction(function=launch_setup),
         ]

@@ -77,7 +77,10 @@ def test_validate_world_file_invalid(world_file):
         module._validate_world_file(world_file)
 
 
-@pytest.mark.parametrize("profile_name", ["default", "lab", "stress10"])
+@pytest.mark.parametrize(
+    "profile_name",
+    ["default", "lab", "lab_gripper", "lab_gripper_5", "lab_gripper_6", "stress10"],
+)
 def test_load_profile_valid(profile_name):
     module = _load_launch_module()
     profile = module._load_profile(profile_name)

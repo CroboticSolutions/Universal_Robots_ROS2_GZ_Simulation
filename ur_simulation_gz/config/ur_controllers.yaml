@@ -23,6 +23,9 @@ controller_manager:
     forward_position_controller:
       type: position_controllers/JointGroupPositionController
 
+    robotiq_gripper_controller:
+      type: parallel_gripper_action_controller/GripperActionController
+
 /**/controller_manager:
   ros__parameters:
     update_rate: 500  # Hz
@@ -47,6 +50,9 @@ controller_manager:
 
     forward_position_controller:
       type: position_controllers/JointGroupPositionController
+
+    robotiq_gripper_controller:
+      type: parallel_gripper_action_controller/GripperActionController
 
 
 speed_scaling_state_broadcaster:
@@ -209,3 +215,23 @@ forward_position_controller:
       - wrist_1_joint
       - wrist_2_joint
       - wrist_3_joint
+
+robotiq_gripper_controller:
+  ros__parameters:
+    joint: robotiq_85_left_knuckle_joint
+    state_interfaces:
+      - position
+      - velocity
+    allow_stalling: true
+    stall_timeout: 0.05
+    goal_tolerance: 0.02
+
+/**/robotiq_gripper_controller:
+  ros__parameters:
+    joint: robotiq_85_left_knuckle_joint
+    state_interfaces:
+      - position
+      - velocity
+    allow_stalling: true
+    stall_timeout: 0.05
+    goal_tolerance: 0.02

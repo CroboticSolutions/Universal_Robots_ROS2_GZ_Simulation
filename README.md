@@ -128,12 +128,62 @@ ros2 launch ur_simulation_gz multi_ur_sim_moveit.launch.py \
   robots_profile:=stress10
 ```
 
+Four, five, or six robots with **Robotiq 2F-85** gripper (clone [PickNik `ros2_robotiq_gripper`](https://github.com/PickNikRobotics/ros2_robotiq_gripper) into the workspace as `robotiq_description` if the distro deb is unavailable):
+
+```
+ros2 launch ur_simulation_gz multi_ur_sim_moveit.launch.py \
+  robots_profile:=lab_gripper
+```
+
+```
+ros2 launch ur_simulation_gz multi_ur_sim_moveit.launch.py \
+  robots_profile:=lab_gripper_5
+```
+
+```
+ros2 launch ur_simulation_gz multi_ur_sim_moveit.launch.py \
+  robots_profile:=lab_gripper_6
+```
+
+Single-robot Gazebo + gripper:
+
+```
+ros2 launch ur_simulation_gz ur_sim_control.launch.py \
+  use_robotiq_gripper:=true
+```
+
+Single-robot Gazebo + gripper + MoveIt with gripper TCP (`robotiq_85_left_finger_tip_link`):
+
+```
+ros2 launch ur_simulation_gz ur_sim_moveit.launch.py \
+  use_robotiq_gripper:=true \
+  semantic_description_file:=srdf/ur_robotiq.srdf.xacro
+```
+
+Gripper control uses `parallel_gripper_action_controller` (`robotiq_gripper_controller`), action `/<ns>/robotiq_gripper_controller/gripper_cmd`, message type `control_msgs/action/ParallelGripperCommand`. **arm_api2** sim config: `config/ur/ur_sim_robotiq.yaml` (parallel backend + finger tip `ee_link_name`).
+
+`ur_sim_control.launch.py` prepends `GZ_SIM_RESOURCE_PATH` / `IGN_GAZEBO_RESOURCE_PATH` when `use_robotiq_gripper:=true` so Gazebo can resolve `model://robotiq_description/meshes/...` (RViz uses `package://` and does not need this). If you spawn URDF another way, set e.g. `export GZ_SIM_RESOURCE_PATH="$(ros2 pkg prefix robotiq_description)/share:$GZ_SIM_RESOURCE_PATH"`.
+
+**Physics engine (mimic / Robotiq):** By default the launch passes `gz sim --physics-engine gz-physics-bullet-featherstone-plugin` so URDF `<mimic>` constraints on the gripper are honored (Dartsim often rejects them with `gz_ros2_control`). Override with `gz_physics_engine:=gz-physics-dartsim-plugin` if you need the old engine. `ur_sim_moveit.launch.py` and `multi_ur_sim_moveit.launch.py` forward the same argument (or set optional `gz_physics_engine` in a multi-robot profile YAML).
+
+### Grasp / friction smoke world
+
+Optional world with a small dynamic cube and elevated ground friction:
+
+```
+ros2 launch ur_simulation_gz ur_sim_control.launch.py \
+  use_robotiq_gripper:=true \
+  world_file:=$(ros2 pkg prefix ur_simulation_gz)/share/ur_simulation_gz/worlds/grasp_smoke.sdf
+```
+
+Protocol (manual): pre-grasp → close gripper → lift 10 cm → hold. If the cube slips, raise `mu` on the cube/ground collisions or reduce cube mass; parallel-jaw + friction-only sims often need tuning.
+
 ### Multi-robot profile argument
 
-- `robots_profile`: Multi-robot profile name. Supported values: `default`, `lab`, `stress10`.
+- `robots_profile`: Multi-robot profile name. Supported values: `default`, `lab`, `lab_gripper`, `lab_gripper_5`, `lab_gripper_6`, `stress10`.
 - Profiles are stored in `ur_simulation_gz/config/multi_ur/*.yaml`.
 - Each profile YAML defines `robot_positions` as a list of objects with `x`, `y`, `z`, `yaw` (radians).
-- Optional profile keys include: `ur_type`, `world_file`, `gazebo_gui`, `robot_namespace_prefix`, `launch_rviz_first_robot`.
+- Optional profile keys include: `ur_type`, `world_file`, `gazebo_gui`, `robot_namespace_prefix`, `launch_rviz_first_robot`, `use_robotiq_gripper` (`"true"` / `"false"`), `gz_physics_engine` (e.g. `gz-physics-bullet-featherstone-plugin` or `gz-physics-dartsim-plugin`), `semantic_description_file` (path relative to `ur_moveit_config` share, e.g. `srdf/ur_robotiq.srdf.xacro`).
 - Launch supports startup staggering to reduce DDS/process spikes on large swarms:
   - `per_robot_start_delay_s`: delay between each robot stack start.
   - `moveit_start_delay_s`: extra delay before each robot's MoveIt stack starts.
@@ -156,7 +206,7 @@ ros2 action list | grep follow_joint_trajectory
 ### Troubleshooting
 
 - **Profile not found**  
-  Ensure `robots_profile` is one of: `default`, `lab`, `stress10`.
+  Ensure `robots_profile` is one of the supported names (see Multi-robot profile argument).
 
 - **`robot_positions` parse failure**  
   Ensure each profile entry has numeric `x`, `y`, `z`, `yaw` fields.

@@ -34,7 +34,7 @@ import subprocess
 import tempfile
 import pytest
 
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 
 
 @pytest.mark.parametrize(
@@ -126,6 +126,47 @@ def test_ur_urdf_xacro(ur_type, prefix):
             check_urdf_process.returncode == 0
         ), "\n --- URDF check failed! --- \nYour xacro does not unfold into a proper urdf robot description. Please check your xacro file."
 
+    finally:
+        os.remove(tmp_urdf_output_file)
+
+
+def test_ur_gz_xacro_with_robotiq_gripper():
+    """UR + Robotiq 2F-85 merge must expand to valid URDF when robotiq_description is present."""
+    try:
+        get_package_share_directory("robotiq_description")
+    except PackageNotFoundError:
+        pytest.skip("robotiq_description not installed (optional dependency for gripper)")
+
+    description_file_path = os.path.join(
+        get_package_share_directory("ur_simulation_gz"), "urdf", "ur_gz.urdf.xacro"
+    )
+    controllers_path = os.path.join(
+        get_package_share_directory("ur_simulation_gz"), "config", "ur_controllers.yaml"
+    )
+    (_, tmp_urdf_output_file) = tempfile.mkstemp(suffix=".urdf")
+    xacro_command = (
+        f"{shutil.which('xacro')}"
+        f" {description_file_path}"
+        f" ur_type:=ur5e"
+        f" name:=ur"
+        f" tf_prefix:=\"\""
+        f" simulation_controllers:={controllers_path}"
+        f" use_robotiq_gripper:=true"
+        f" > {tmp_urdf_output_file}"
+    )
+    check_urdf_command = f"{shutil.which('check_urdf')} {tmp_urdf_output_file}"
+    try:
+        xacro_process = subprocess.run(
+            xacro_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
+        )
+        assert xacro_process.returncode == 0, xacro_process.stderr.decode()
+        check_urdf_process = subprocess.run(
+            check_urdf_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
+        )
+        assert check_urdf_process.returncode == 0, check_urdf_process.stderr.decode()
+        with open(tmp_urdf_output_file, encoding="utf-8") as handle:
+            urdf_text = handle.read()
+        assert "robotiq_85_left_knuckle_joint" in urdf_text
     finally:
         os.remove(tmp_urdf_output_file)
 

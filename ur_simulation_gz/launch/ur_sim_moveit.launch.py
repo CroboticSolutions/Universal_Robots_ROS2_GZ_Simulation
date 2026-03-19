@@ -43,6 +43,9 @@ def launch_setup(context, *args, **kwargs):
     controllers_file = LaunchConfiguration("controllers_file")
     description_file = LaunchConfiguration("description_file")
     moveit_launch_file = LaunchConfiguration("moveit_launch_file")
+    use_robotiq_gripper = LaunchConfiguration("use_robotiq_gripper")
+    semantic_description_file = LaunchConfiguration("semantic_description_file")
+    gz_physics_engine = LaunchConfiguration("gz_physics_engine")
 
     ur_control_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -56,6 +59,8 @@ def launch_setup(context, *args, **kwargs):
             "controllers_file": controllers_file,
             "description_file": description_file,
             "launch_rviz": "false",
+            "use_robotiq_gripper": use_robotiq_gripper,
+            "gz_physics_engine": gz_physics_engine,
         }.items(),
     )
 
@@ -65,6 +70,7 @@ def launch_setup(context, *args, **kwargs):
             "ur_type": ur_type,
             "use_sim_time": "true",
             "launch_rviz": "true",
+            "semantic_description_file": semantic_description_file,
         }.items(),
     )
 
@@ -140,6 +146,31 @@ def generate_launch_description():
             ),
             description="Absolute path for MoveIt launch file, part of a config package with robot SRDF/XACRO files. Usually the argument "
             "is not set, it enables use of a custom moveit config.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "use_robotiq_gripper",
+            default_value="false",
+            choices=["true", "false"],
+            description="Attach simulated Robotiq 2F-85 and spawn parallel gripper controller.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "semantic_description_file",
+            default_value="srdf/ur.srdf.xacro",
+            description="MoveIt SRDF xacro relative to ur_moveit_config (use srdf/ur_robotiq.srdf.xacro with gripper).",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "gz_physics_engine",
+            default_value="gz-physics-bullet-featherstone-plugin",
+            description=(
+                "Forwarded to ur_sim_control (`gz sim --physics-engine`). "
+                "Bullet-Featherstone supports URDF mimic (Robotiq); use gz-physics-dartsim-plugin for legacy behavior."
+            ),
         )
     )
 

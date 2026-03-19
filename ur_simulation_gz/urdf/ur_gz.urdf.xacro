@@ -24,6 +24,10 @@
 
   <xacro:arg name="simulation_controllers" default="" />
   <xacro:arg name="ros_namespace" default="" />
+  <!-- Set true to attach Robotiq 2F-85 (PickNik robotiq_description) and expose gripper joint in gz_ros2_control -->
+  <xacro:arg name="use_robotiq_gripper" default="false" />
+
+  <xacro:property name="use_rq_gripper" value="$(arg use_robotiq_gripper)" />
 
   <!-- create link fixed to the "world" -->
   <link name="world" />
@@ -69,6 +73,26 @@
     <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
   </xacro:ur_robot>
 
+  <xacro:if value="${use_rq_gripper == True or use_rq_gripper == 'true'}">
+    <xacro:include filename="$(find robotiq_description)/urdf/ur_to_robotiq_adapter.urdf.xacro" />
+    <xacro:include filename="$(find robotiq_description)/urdf/robotiq_2f_85_macro.urdf.xacro" />
+    <xacro:ur_to_robotiq
+      prefix="$(arg tf_prefix)"
+      parent="$(arg tf_prefix)tool0"
+      child="$(arg tf_prefix)robotiq_coupler_link"
+    />
+    <xacro:robotiq_gripper
+      name="$(arg name)"
+      prefix="$(arg tf_prefix)"
+      parent="$(arg tf_prefix)robotiq_coupler_link"
+      include_ros2_control="false"
+      sim_gazebo="false"
+      use_fake_hardware="false"
+    >
+      <origin xyz="0 0 0" rpy="0 0 0" />
+    </xacro:robotiq_gripper>
+  </xacro:if>
+
   <gazebo reference="world">
   </gazebo>
   <gazebo>
@@ -85,5 +109,6 @@
     name="$(arg name)"
     tf_prefix="$(arg tf_prefix)"
     transmission_hw_interface="$(arg transmission_hw_interface)"
+    use_robotiq_gripper="$(arg use_robotiq_gripper)"
   />
 </robot>
