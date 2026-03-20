@@ -2,7 +2,7 @@
 ur_type: ur5e
 semantic_description_file: srdf/ur_robotiq.srdf.xacro
 gazebo_gui: "true"
-world_file: empty.sdf
+world_file: lab_table_coke.sdf
 robot_namespace_prefix: ur
 launch_rviz_first_robot: "true"
 launch_servo: "false"

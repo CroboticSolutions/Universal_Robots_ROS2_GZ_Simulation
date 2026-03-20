@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<!-- Static table + dynamic Coke can for multi-UR / gripper lab (model://Table, model://Coke). -->
+<sdf version="1.10">
+  <world name="lab_table_coke">
+    <physics type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+    <gravity>0 0 -9.81</gravity>
+
+    <!-- Bez izvora svjetla vizuali bez materijala izgledaju gotovo crno. -->
+    <scene>
+      <ambient>0.5 0.5 0.52 1</ambient>
+      <background>0.8 0.85 0.9 1</background>
+    </scene>
+    <light name="sun" type="directional">
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.95 0.95 0.95 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <direction>-0.3 0.2 -1</direction>
+      <cast_shadows>true</cast_shadows>
+    </light>
+
+    <model name="ground">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>50 50 0.02</size>
+            </box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>4.0</mu>
+                <mu2>4.0</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>50 50 0.02</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.35 0.35 0.38 1</ambient>
+            <diffuse>0.45 0.45 0.48 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <include>
+      <uri>model://Table</uri>
+      <name>lab_table</name>
+      <pose>1 -0.55 0 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://Coke</uri>
+      <name>coke_can</name>
+      <!-- Table top ~0.05 m; can length 0.12 m → center ~0.05 + 0.06 + small air gap -->
+      <pose>0.55 0 0.7 0 0 0</pose>
+    </include>
+  </world>
+</sdf>

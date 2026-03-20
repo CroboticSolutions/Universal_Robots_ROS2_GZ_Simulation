@@ -198,6 +198,13 @@ def launch_setup(context, *args, **kwargs):
     world_file = _validate_world_file(
         str(profile.get("world_file", LaunchConfiguration("world_file").perform(context)))
     )
+    if not os.path.isabs(world_file) and world_file != "empty.sdf":
+        pkg_worlds_dir = os.path.join(
+            get_package_share_directory("ur_simulation_gz"), "worlds"
+        )
+        candidate = os.path.join(pkg_worlds_dir, world_file)
+        if os.path.isfile(candidate):
+            world_file = candidate
     gz_physics_engine = str(
         profile.get(
             "gz_physics_engine",

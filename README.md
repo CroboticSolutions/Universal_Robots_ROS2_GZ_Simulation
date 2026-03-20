@@ -135,6 +135,8 @@ ros2 launch ur_simulation_gz multi_ur_sim_moveit.launch.py \
   robots_profile:=lab_gripper
 ```
 
+The `lab_gripper` profile uses world **`lab_table_coke.sdf`**: static **Table** and dynamic **Coke** (`model://Table`, `model://Coke` under `ur_simulation_gz/models/`). Override with `world_file:=empty.sdf` if you want a bare floor.
+
 ```
 ros2 launch ur_simulation_gz multi_ur_sim_moveit.launch.py \
   robots_profile:=lab_gripper_5
@@ -152,7 +154,7 @@ ros2 launch ur_simulation_gz ur_sim_control.launch.py \
   use_robotiq_gripper:=true
 ```
 
-Single-robot Gazebo + gripper + MoveIt with gripper TCP (`robotiq_85_left_finger_tip_link`):
+Single-robot Gazebo + gripper + MoveIt (`srdf/ur_robotiq.srdf.xacro`):
 
 ```
 ros2 launch ur_simulation_gz ur_sim_moveit.launch.py \
@@ -160,11 +162,17 @@ ros2 launch ur_simulation_gz ur_sim_moveit.launch.py \
   semantic_description_file:=srdf/ur_robotiq.srdf.xacro
 ```
 
+**MoveIt group `ur_manipulator`** ends at **`tool0`** (6 DOF) so planned trajectories match `scaled_joint_trajectory_controller`. Open/close the gripper via **`robotiq_gripper_controller`** (not part of that trajectory). TF still exposes the finger tip for IK/apps; use RViz **Planning Group** `ur_manipulator` and move the gripper with the separate gripper action when needed.
+
 Gripper control uses `parallel_gripper_action_controller` (`robotiq_gripper_controller`), action `/<ns>/robotiq_gripper_controller/gripper_cmd`, message type `control_msgs/action/ParallelGripperCommand`. **arm_api2** sim config: `config/ur/ur_sim_robotiq.yaml` (parallel backend + finger tip `ee_link_name`).
 
-`ur_sim_control.launch.py` prepends `GZ_SIM_RESOURCE_PATH` / `IGN_GAZEBO_RESOURCE_PATH` when `use_robotiq_gripper:=true` so Gazebo can resolve `model://robotiq_description/meshes/...` (RViz uses `package://` and does not need this). If you spawn URDF another way, set e.g. `export GZ_SIM_RESOURCE_PATH="$(ros2 pkg prefix robotiq_description)/share:$GZ_SIM_RESOURCE_PATH"`.
+`ur_sim_control.launch.py` always prepends `GZ_SIM_RESOURCE_PATH` / `IGN_GAZEBO_RESOURCE_PATH` with `share/ur_simulation_gz/models` so `model://Table` and `model://Coke` resolve. When `use_robotiq_gripper:=true`, it also prepends the parent of `robotiq_description/share` for `model://robotiq_description/...`. (RViz uses `package://` and does not need this.) **Table:** replace `models/Table/meshes/table.stl` with your own STL (same path) if the placeholder box mesh is not what you want.
 
 **Physics engine (mimic / Robotiq):** By default the launch passes `gz sim --physics-engine gz-physics-bullet-featherstone-plugin` so URDF `<mimic>` constraints on the gripper are honored (Dartsim often rejects them with `gz_ros2_control`). Override with `gz_physics_engine:=gz-physics-dartsim-plugin` if you need the old engine. `ur_sim_moveit.launch.py` and `multi_ur_sim_moveit.launch.py` forward the same argument (or set optional `gz_physics_engine` in a multi-robot profile YAML).
+
+### Lab table + Coke world
+
+`worlds/lab_table_coke.sdf` — large ground plane, **static** table, **dynamic** Coke can (cylinder collision, mesh visual). Used by default in the **`lab_gripper`** multi-robot profile. The **Table** model uses **`meshes/stainless_steel_table.stl`** for the visual only; physics uses a single tabletop collision box (edit `models/Table/model.sdf` as needed).
 
 ### Grasp / friction smoke world
 

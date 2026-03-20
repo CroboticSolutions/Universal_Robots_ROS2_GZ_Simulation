@@ -525,6 +525,10 @@ def generate_launch_description():
         )
     )
 
+    # model://Table, model://Coke live under share/ur_simulation_gz/models/
+    simulation_models_path = PathJoinSubstitution(
+        [FindPackageShare("ur_simulation_gz"), "models"]
+    )
     # Gazebo resolves model://robotiq_description/... against GZ_SIM_RESOURCE_PATH.
     # Parent of share/robotiq_description is .../share so model URI maps to package meshes.
     robotiq_resource_parent = PathJoinSubstitution(
@@ -537,6 +541,16 @@ def generate_launch_description():
     return LaunchDescription(
         declared_arguments
         + [
+            AppendEnvironmentVariable(
+                name="GZ_SIM_RESOURCE_PATH",
+                value=simulation_models_path,
+                prepend=True,
+            ),
+            AppendEnvironmentVariable(
+                name="IGN_GAZEBO_RESOURCE_PATH",
+                value=simulation_models_path,
+                prepend=True,
+            ),
             AppendEnvironmentVariable(
                 name="GZ_SIM_RESOURCE_PATH",
                 value=robotiq_resource_parent,
