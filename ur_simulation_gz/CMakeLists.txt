@@ -10,7 +10,7 @@ option(
   OFF
 )
 
-install(DIRECTORY config launch urdf worlds models
+install(DIRECTORY config doc launch urdf worlds models
   DESTINATION share/${PROJECT_NAME}
 )
 

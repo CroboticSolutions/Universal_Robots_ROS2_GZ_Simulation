@@ -1,6 +1,8 @@
 import math
+import json
 import os
 import re
+import time
 import yaml
 
 from ament_index_python.packages import get_package_share_directory
@@ -22,6 +24,23 @@ PROFILE_TO_FILE = {
     "lab_gripper_6": "lab_gripper_6.yaml",
     "stress10": "stress10.yaml",
 }
+
+
+def _agent_log(run_id: str, hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    payload = {
+        "sessionId": "37d04d",
+        "runId": run_id,
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+    }
+    try:
+        with open("/root/.cursor/debug-37d04d.log", "a", encoding="utf-8") as log_file:
+            log_file.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except Exception:
+        pass
 
 
 def _parse_robot_count(value: str) -> int:
@@ -276,9 +295,37 @@ def launch_setup(context, *args, **kwargs):
         robot_count = _parse_robot_count(str(len(raw_positions)))
     positions = _parse_profile_positions(profile.get("robot_positions"), robot_count)
 
+    camera_gz_robots_raw = profile.get("camera_gz_robots", [])
+    if not isinstance(camera_gz_robots_raw, list):
+        camera_gz_robots_raw = []
+    camera_gz_set = {
+        str(x).strip().lower() for x in camera_gz_robots_raw if str(x).strip()
+    }
+
     control_launch_path = PathJoinSubstitution(
         [FindPackageShare("ur_simulation_gz"), "launch", "ur_sim_control.launch.py"]
     )
+
+    # region agent log
+    _agent_log(
+        run_id="pre-fix",
+        hypothesis_id="H1",
+        location="multi_ur_sim_moveit.launch.py:launch_setup",
+        message="profile resolved for multi-robot launch",
+        data={
+            "robots_profile": robots_profile,
+            "robot_count": robot_count,
+            "world_file": world_file,
+            "gazebo_gui": gazebo_gui,
+            "gz_physics_engine": gz_physics_engine,
+            "controllers_file": controllers_file,
+            "use_robotiq_gripper": use_robotiq_gripper,
+            "per_robot_start_delay_s": per_robot_start_delay_s,
+            "moveit_start_delay_s": moveit_start_delay_s,
+            "camera_gz_set": sorted(camera_gz_set),
+        },
+    )
+    # endregion
 
     actions = []
     for index, (x, y, z, yaw) in enumerate(positions):
@@ -288,6 +335,26 @@ def launch_setup(context, *args, **kwargs):
         launch_world = "true" if index == 0 else "false"
         launch_rviz = "true" if launch_rviz_first_robot and index == 0 else "false"
         warehouse_sqlite_path = f"{warehouse_sqlite_base}_{robot_namespace}.sqlite"
+
+        camera_gz_enabled = "true" if robot_namespace.lower() in camera_gz_set else "false"
+
+        # region agent log
+        _agent_log(
+            run_id="pre-fix",
+            hypothesis_id="H3",
+            location="multi_ur_sim_moveit.launch.py:robot_loop",
+            message="per-robot include arguments prepared",
+            data={
+                "index": index,
+                "robot_namespace": robot_namespace,
+                "robot_name": robot_namespace,
+                "spawn": {"x": x, "y": y, "z": z, "yaw": yaw},
+                "launch_gz_world": launch_world,
+                "camera_gz_enabled": camera_gz_enabled,
+                "start_offset": float(index) * per_robot_start_delay_s,
+            },
+        )
+        # endregion
 
         control_include = IncludeLaunchDescription(
             PythonLaunchDescriptionSource(control_launch_path),
@@ -313,6 +380,7 @@ def launch_setup(context, *args, **kwargs):
                 "spawn_yaw": str(yaw),
                 "use_robotiq_gripper": use_robotiq_gripper,
                 "gz_physics_engine": gz_physics_engine,
+                "camera_gz_enabled": camera_gz_enabled,
             }.items(),
         )
         moveit_include = IncludeLaunchDescription(

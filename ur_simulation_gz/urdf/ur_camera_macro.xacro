@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/xacro">
+  <!--
+    Wrist RGB-D camera (same layout as piper_description): camera_joint -> camera_link -> camera_optical_frame.
+    Gazebo Sim rgbd_camera (RGB + depth + point cloud) only when camera_gz_enabled is true.
+  -->
+  <xacro:macro name="ur_wrist_rgb_camera" params="tf_prefix parent_link camera_gz_enabled">
+    <xacro:property name="cam_prefix" value="${tf_prefix}"/>
+    <!-- Piper-equivalent mount on flange (tool0): same offset/rotation as Piper link6 -> camera_link. -->
+    <joint name="${cam_prefix}camera_joint" type="fixed">
+      <origin xyz="-0.05 0 0" rpy="0 -1.5708 0"/>
+      <parent link="${parent_link}"/>
+      <child link="${cam_prefix}camera_link"/>
+    </joint>
+    <link name="${cam_prefix}camera_link">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="0.01"/>
+        <inertia ixx="0.00001" ixy="0.0" ixz="0.0" iyy="0.00001" iyz="0.0" izz="0.00001"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.02 0.04 0.02"/>
+        </geometry>
+        <material name="wrist_camera_black">
+          <color rgba="0.0 0.0 0.0 1.0"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.02 0.04 0.02"/>
+        </geometry>
+      </collision>
+    </link>
+    <!-- ROS optical: X right, Y down, Z forward (same as Piper camera_optical_joint). -->
+    <joint name="${cam_prefix}camera_optical_joint" type="fixed">
+      <origin xyz="0 0 0" rpy="-1.5708 0 -1.5708"/>
+      <parent link="${cam_prefix}camera_link"/>
+      <child link="${cam_prefix}camera_optical_frame"/>
+    </joint>
+    <link name="${cam_prefix}camera_optical_frame">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="0.0001"/>
+        <inertia ixx="0.00000001" ixy="0.0" ixz="0.0" iyy="0.00000001" iyz="0.0" izz="0.00000001"/>
+      </inertial>
+    </link>
+
+    <xacro:if value="${camera_gz_enabled == True or camera_gz_enabled == 'true'}">
+      <gazebo reference="${cam_prefix}camera_link">
+        <sensor name="camera" type="rgbd_camera">
+          <camera>
+            <horizontal_fov>1.3962634</horizontal_fov>
+            <image>
+              <width>640</width>
+              <height>480</height>
+            </image>
+            <clip>
+              <near>0.02</near>
+              <far>300</far>
+            </clip>
+          </camera>
+          <depth_camera>
+            <image>
+              <width>640</width>
+              <height>480</height>
+              <format>R_FLOAT32</format>
+            </image>
+            <clip>
+              <near>0.02</near>
+              <far>10.0</far>
+            </clip>
+            <point_cloud>true</point_cloud>
+          </depth_camera>
+          <always_on>1</always_on>
+          <update_rate>30</update_rate>
+          <visualize>true</visualize>
+        </sensor>
+      </gazebo>
+    </xacro:if>
+  </xacro:macro>
+</robot>

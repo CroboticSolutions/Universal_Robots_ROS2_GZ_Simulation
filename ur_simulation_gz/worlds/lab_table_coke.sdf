@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <!-- Static table + dynamic Coke can for multi-UR / gripper lab (model://Table, model://Coke). -->
+<!-- World plugins: gz-sim-sensors-system + ogre2 required for RGB/RGB-D camera rendering (see gz-sim sensors_demo). -->
 <sdf version="1.10">
   <world name="lab_table_coke">
     <physics type="ode">
@@ -9,10 +10,19 @@
     </physics>
     <gravity>0 0 -9.81</gravity>
 
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-contact-system" name="gz::sim::systems::Contact"/>
+
     <!-- Bez izvora svjetla vizuali bez materijala izgledaju gotovo crno. -->
     <scene>
       <ambient>0.5 0.5 0.52 1</ambient>
       <background>0.8 0.85 0.9 1</background>
+      <shadows>1</shadows>
     </scene>
     <light name="sun" type="directional">
       <pose>0 0 10 0 0 0</pose>

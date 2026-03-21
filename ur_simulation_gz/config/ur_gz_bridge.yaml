@@ -1,0 +1,58 @@
+# GZ -> ROS (Piper-style: single file for clock + RGB-D camera + point cloud).
+# ros_gz_bridge parameter_bridge config (see ros_gz_bridge README Example 5).
+# World name must match <world name="..."> in the loaded .sdf (e.g. lab_table_coke).
+# Verify gz_topic_name with: gz topic -l | grep -E 'camera|clock'
+#
+# GZ -> ROS clock (unidirectional)
+- ros_topic_name: "/clock"
+  gz_topic_name: "/clock"
+  ros_type_name: "rosgraph_msgs/msg/Clock"
+  gz_type_name: "gz.msgs.Clock"
+  direction: "GZ_TO_ROS"
+
+# --- ur1 (namespace-style ROS topics) ---
+# RGB image
+- ros_topic_name: "/ur1/camera/image_raw"
+  gz_topic_name: "/world/lab_table_coke/model/ur1/link/wrist_3_link/sensor/camera/image"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: "GZ_TO_ROS"
+  qos_profile: SENSOR_DATA
+
+# Camera info
+- ros_topic_name: "/ur1/camera/camera_info"
+  gz_topic_name: "/world/lab_table_coke/model/ur1/link/wrist_3_link/sensor/camera/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  direction: "GZ_TO_ROS"
+  qos_profile: SENSOR_DATA
+
+# Point cloud (rgbd_camera)
+- ros_topic_name: "/ur1/camera/points"
+  gz_topic_name: "/world/lab_table_coke/model/ur1/link/wrist_3_link/sensor/camera/points"
+  ros_type_name: "sensor_msgs/msg/PointCloud2"
+  gz_type_name: "gz.msgs.PointCloudPacked"
+  direction: "GZ_TO_ROS"
+  qos_profile: SENSOR_DATA
+
+# --- ur2 ---
+- ros_topic_name: "/ur2/camera/image_raw"
+  gz_topic_name: "/world/lab_table_coke/model/ur2/link/wrist_3_link/sensor/camera/image"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: "GZ_TO_ROS"
+  qos_profile: SENSOR_DATA
+
+- ros_topic_name: "/ur2/camera/camera_info"
+  gz_topic_name: "/world/lab_table_coke/model/ur2/link/wrist_3_link/sensor/camera/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  direction: "GZ_TO_ROS"
+  qos_profile: SENSOR_DATA
+
+- ros_topic_name: "/ur2/camera/points"
+  gz_topic_name: "/world/lab_table_coke/model/ur2/link/wrist_3_link/sensor/camera/points"
+  ros_type_name: "sensor_msgs/msg/PointCloud2"
+  gz_type_name: "gz.msgs.PointCloudPacked"
+  direction: "GZ_TO_ROS"
+  qos_profile: SENSOR_DATA

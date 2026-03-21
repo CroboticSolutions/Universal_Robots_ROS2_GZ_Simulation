@@ -28,6 +28,9 @@
 #
 # Author: Denis Stogl
 
+import json
+import time
+
 from launch import LaunchDescription
 from launch.actions import (
     AppendEnvironmentVariable,
@@ -50,6 +53,23 @@ from launch.substitutions import (
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
+
+
+def _agent_log(run_id: str, hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    payload = {
+        "sessionId": "37d04d",
+        "runId": run_id,
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+    }
+    try:
+        with open("/root/.cursor/debug-37d04d.log", "a", encoding="utf-8") as log_file:
+            log_file.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except Exception:
+        pass
 
 
 def launch_setup(context, *args, **kwargs):
@@ -78,12 +98,41 @@ def launch_setup(context, *args, **kwargs):
     spawn_y = LaunchConfiguration("spawn_y")
     spawn_z = LaunchConfiguration("spawn_z")
     spawn_yaw = LaunchConfiguration("spawn_yaw")
+    camera_gz_enabled = LaunchConfiguration("camera_gz_enabled")
+    camera_bridge_config_file = LaunchConfiguration("camera_bridge_config_file")
 
     namespace_value = robot_namespace.perform(context).strip("/")
     if namespace_value:
         controller_manager = f"/{namespace_value}/controller_manager"
     else:
         controller_manager = "/controller_manager"
+    launch_gz_world_value = launch_gz_world.perform(context)
+    gazebo_gui_value = gazebo_gui.perform(context)
+    world_file_value = world_file.perform(context)
+    gz_physics_engine_value = gz_physics_engine.perform(context)
+    controllers_file_value = controllers_file.perform(context)
+    use_robotiq_value = use_robotiq_gripper.perform(context)
+    camera_gz_enabled_value = camera_gz_enabled.perform(context)
+
+    # region agent log
+    _agent_log(
+        run_id="pre-fix",
+        hypothesis_id="H2",
+        location="ur_sim_control.launch.py:launch_setup",
+        message="control launch resolved values",
+        data={
+            "namespace_value": namespace_value,
+            "controller_manager": controller_manager,
+            "launch_gz_world": launch_gz_world_value,
+            "gazebo_gui": gazebo_gui_value,
+            "world_file": world_file_value,
+            "gz_physics_engine": gz_physics_engine_value,
+            "controllers_file": controllers_file_value,
+            "use_robotiq_gripper": use_robotiq_value,
+            "camera_gz_enabled": camera_gz_enabled_value,
+        },
+    )
+    # endregion
 
     robot_description_content = Command(
         [
@@ -117,6 +166,9 @@ def launch_setup(context, *args, **kwargs):
             " ",
             "use_robotiq_gripper:=",
             use_robotiq_gripper,
+            " ",
+            "camera_gz_enabled:=",
+            camera_gz_enabled,
         ]
     )
     robot_state_publisher_node = Node(
@@ -275,6 +327,22 @@ def launch_setup(context, *args, **kwargs):
                 )
             )
 
+    # region agent log
+    _agent_log(
+        run_id="pre-fix",
+        hypothesis_id="H4",
+        location="ur_sim_control.launch.py:spawner_plan",
+        message="spawner plan resolved",
+        data={
+            "namespace_value": namespace_value,
+            "use_robotiq_flag": use_robotiq_flag,
+            "activate_joint_flag": activate_joint_flag,
+            "controller_manager": controller_manager,
+            "initial_joint_controller": initial_joint_controller.perform(context),
+        },
+    )
+    # endregion
+
     # GZ nodes
     gz_spawn_entity = Node(
         package="ros_gz_sim",
@@ -322,14 +390,13 @@ def launch_setup(context, *args, **kwargs):
         condition=IfCondition(launch_gz_world),
     )
 
-    # Make the /clock topic available in ROS
-    gz_sim_bridge = Node(
+    # Piper-style: one ros_gz_bridge YAML (clock + cameras + point clouds); see config/ur_gz_bridge.yaml
+    gz_bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
-        arguments=[
-            "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
-        ],
+        name="gz_bridge",
         output="screen",
+        parameters=[{"config_file": camera_bridge_config_file}],
         condition=IfCondition(launch_gz_world),
     )
 
@@ -342,7 +409,7 @@ def launch_setup(context, *args, **kwargs):
         *gripper_after_arm_controller_handlers,
         gz_spawn_entity,
         gz_launch_description,
-        gz_sim_bridge,
+        gz_bridge,
     ]
 
     return nodes_to_start
@@ -513,7 +580,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "launch_gz_world",
             default_value="true",
-            description="Start Gazebo world and /clock bridge. Set false for multi-robot composed launches.",
+            description="Start Gazebo world and gz_bridge (clock+cameras from ur_gz_bridge.yaml). False for other robots in multi-UR.",
         )
     )
     declared_arguments.append(
@@ -522,6 +589,31 @@ def generate_launch_description():
             default_value="false",
             choices=["true", "false"],
             description="If true, attach Robotiq 2F-85 (robotiq_description) and spawn robotiq_gripper_controller.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "camera_gz_enabled",
+            default_value="false",
+            choices=["true", "false"],
+            description="If true, spawn Gazebo rgbd_camera on camera_link (see ur_camera_macro).",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "enable_camera_bridge",
+            default_value="auto",
+            choices=["auto", "true", "false"],
+            description="Deprecated: ignored. Single gz_bridge uses camera_bridge_config_file when Gazebo starts.",
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "camera_bridge_config_file",
+            default_value=PathJoinSubstitution(
+                [FindPackageShare("ur_simulation_gz"), "config", "ur_gz_bridge.yaml"]
+            ),
+            description="ros_gz_bridge YAML: /clock + per-robot camera image/camera_info/points (Piper-style).",
         )
     )
 

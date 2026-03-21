@@ -26,8 +26,12 @@
   <xacro:arg name="ros_namespace" default="" />
   <!-- Set true to attach Robotiq 2F-85 (PickNik robotiq_description) and expose gripper joint in gz_ros2_control -->
   <xacro:arg name="use_robotiq_gripper" default="false" />
+  <!-- When true, spawn Gazebo rgbd_camera on camera_link (multi-UR: only selected namespaces). -->
+  <xacro:arg name="camera_gz_enabled" default="false" />
 
   <xacro:property name="use_rq_gripper" value="$(arg use_robotiq_gripper)" />
+
+  <xacro:include filename="$(find ur_simulation_gz)/urdf/ur_camera_macro.xacro"/>
 
   <!-- create link fixed to the "world" -->
   <link name="world" />
@@ -92,6 +96,13 @@
       <origin xyz="0 0 0" rpy="0 0 0" />
     </xacro:robotiq_gripper>
   </xacro:if>
+
+  <!-- Wrist RGB-D (Piper-style): links + optical TF for all; Gazebo rgbd_camera if camera_gz_enabled:=true -->
+  <xacro:ur_wrist_rgb_camera
+    tf_prefix="$(arg tf_prefix)"
+    parent_link="$(arg tf_prefix)tool0"
+    camera_gz_enabled="$(arg camera_gz_enabled)"
+  />
 
   <gazebo reference="world">
   </gazebo>
