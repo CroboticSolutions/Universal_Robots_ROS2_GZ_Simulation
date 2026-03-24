@@ -8,7 +8,7 @@
     <xacro:property name="cam_prefix" value="${tf_prefix}"/>
     <!-- Piper-equivalent mount on flange (tool0): same offset/rotation as Piper link6 -> camera_link. -->
     <joint name="${cam_prefix}camera_joint" type="fixed">
-      <origin xyz="-0.05 0 0" rpy="0 -1.5708 0"/>
+      <origin xyz="0 -0.05 0.03" rpy="1.5708 -1.5708 0"/>
       <parent link="${parent_link}"/>
       <child link="${cam_prefix}camera_link"/>
     </joint>

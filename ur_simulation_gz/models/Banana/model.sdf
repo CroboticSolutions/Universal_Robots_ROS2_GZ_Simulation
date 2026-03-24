@@ -1,0 +1,38 @@
+<?xml version='1.0' ?>
+<sdf version="1.6">
+    <model name="Banana for Scale">
+        <static>true</static>
+        <link name="link">
+            <!-- ~120 g fruit; COM near mesh anchor. Inertia: uniform box sx=0.22 sy=0.06 sz=0.06 m (bounding approx). -->
+            <inertial>
+                <pose>0 0 0.12 0 0 0</pose>
+                <mass>0.118</mass>
+                <inertia>
+                    <ixx>7.08e-05</ixx>
+                    <ixy>0</ixy>
+                    <ixz>0</ixz>
+                    <iyy>5.11e-04</iyy>
+                    <iyz>0</iyz>
+                    <izz>5.11e-04</izz>
+                </inertia>
+            </inertial>
+            <!-- Mesh collision matches visual; if Bullet segfaults in GImpact BVH, use a box here instead. -->
+            <collision name="collision">
+                <pose>0 0 0.12 0 0 1.5708</pose>
+                <geometry>
+                    <mesh>
+                        <uri>meshes/Banana.dae</uri>
+                    </mesh>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <pose>0 0 0.12 0 0 1.5708</pose>
+                <geometry>
+                    <mesh>
+                        <uri>meshes/Banana.dae</uri>
+                    </mesh>
+                </geometry>
+            </visual>
+        </link>
+    </model>
+</sdf>

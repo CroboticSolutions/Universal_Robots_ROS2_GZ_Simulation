@@ -1,6 +1,6 @@
 # Four UR5e with Robotiq 2F-85 (same layout as lab.yaml).
 # Simulated RGB-D cameras (Gazebo): only these namespaces spawn the rgbd sensor (bridge is Piper-style: config/ur_gz_bridge.yaml on first stack).
-camera_gz_robots: [ur1]
+camera_gz_robots: [ur1, ur2]
 ur_type: ur5e
 semantic_description_file: srdf/ur_robotiq.srdf.xacro
 gazebo_gui: "true"
@@ -11,19 +11,19 @@ launch_servo: "false"
 publish_robot_description_semantic: "true"
 use_robotiq_gripper: "true"
 robot_positions:
-  - x: 0.0
-    y: 0.0
+  - x: -0.2
+    y: -0.1
     z: 0.0
     yaw: 0.0
-  - x: 2.0
-    y: 0.0
+  - x: 1.8
+    y: -0.1
     z: 0.0
     yaw: 0.0
-  #- x: 0.0
-  #  y: 2.0
-  #  z: 0.0
-  #  yaw: 1.57
-  #- x: 2.0
-  #  y: 2.0
-  #  z: 0.0
-  #  yaw: 1.57
+  - x: -0.2
+    y: 2.0
+    z: 0.0
+    yaw: 1.57
+  - x: 1.8
+    y: 2.0
+    z: 0.0
+    yaw: 1.57

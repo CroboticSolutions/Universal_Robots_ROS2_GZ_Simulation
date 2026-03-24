@@ -213,7 +213,12 @@ def launch_setup(context, *args, **kwargs):
             LaunchConfiguration("initial_joint_controller").perform(context),
         )
     )
-    gazebo_gui = str(profile.get("gazebo_gui", LaunchConfiguration("gazebo_gui").perform(context)))
+    # Default launch arg is "inherit" so profile YAML can set GUI; explicit gazebo_gui:=true|false overrides profile.
+    _gui_arg = LaunchConfiguration("gazebo_gui").perform(context)
+    if _gui_arg != "inherit":
+        gazebo_gui = _gui_arg
+    else:
+        gazebo_gui = str(profile.get("gazebo_gui", "true"))
     world_file = _validate_world_file(
         str(profile.get("world_file", LaunchConfiguration("world_file").perform(context)))
     )
@@ -492,7 +497,11 @@ def generate_launch_description():
                 description="Robot controller to start.",
             ),
             DeclareLaunchArgument(
-                "gazebo_gui", default_value="true", description="Start Gazebo with GUI?"
+                "gazebo_gui",
+                default_value="inherit",
+                description=(
+                    "Start Gazebo with GUI: true, false, or inherit (use gazebo_gui from robots_profile YAML)."
+                ),
             ),
             DeclareLaunchArgument(
                 "world_file",
