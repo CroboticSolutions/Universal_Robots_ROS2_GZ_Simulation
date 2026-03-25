@@ -108,3 +108,27 @@ def test_parse_profile_positions_invalid():
     module = _load_launch_module()
     with pytest.raises(ValueError):
         module._parse_profile_positions([{"x": 0.0, "y": 0.0}], 1)
+
+
+def test_world_prop_spawn_centroid_round_trip_identity():
+    """Horizontal XY only: spawn + R*(ox,oy,0) = profile; Z passes through unchanged."""
+    module = _load_launch_module()
+    ox, oy, oz = 0.1, -0.2, 0.05
+    offsets = {"Box": (ox, oy, oz)}
+    sx, sy, sz = module._world_prop_spawn_xyz_from_profile_centroid(
+        offsets, "Box", 1.0, 2.0, 0.5, 0.0, 0.0, 0.0
+    )
+    assert abs(sx - (1.0 - ox)) < 1e-9
+    assert abs(sy - (2.0 - oy)) < 1e-9
+    assert abs(sz - 0.5) < 1e-9
+    r_mat = module._rpy_to_rot_matrix(0.0, 0.0, 0.0)
+    rx, ry, _ = module._mat_vec_mul(r_mat, (ox, oy, 0.0))
+    assert abs((sx + rx) - 1.0) < 1e-9
+    assert abs((sy + ry) - 2.0) < 1e-9
+
+
+def test_load_world_prop_centroid_offsets_has_table():
+    module = _load_launch_module()
+    data = module._load_world_prop_centroid_offsets()
+    assert "Table" in data
+    assert len(data["Table"]) == 3

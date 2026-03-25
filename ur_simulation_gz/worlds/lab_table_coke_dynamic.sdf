@@ -1,0 +1,180 @@
+<?xml version="1.0"?>
+<!-- Static tables + props for multi-UR / gripper lab. Factory: textured walls + ground_plane (factory_floor assets). ur1 @ (0,0); ur2 table @ +2 X. -->
+<!-- World plugins: gz-sim-sensors-system + ogre2 required for RGB/RGB-D camera rendering (see gz-sim sensors_demo). -->
+<sdf version="1.10">
+  <world name="lab_table_coke">
+    <physics type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+    <gravity>0 0 -9.81</gravity>
+
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-contact-system" name="gz::sim::systems::Contact"/>
+
+    <!-- Bez izvora svjetla vizuali bez materijala izgledaju gotovo crno. -->
+    <scene>
+      <ambient>0.5 0.5 0.52 1</ambient>
+      <background>0.8 0.85 0.9 1</background>
+      <shadows>1</shadows>
+    </scene>
+    <light name="sun" type="directional">
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.95 0.95 0.95 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <direction>-0.3 0.2 -1</direction>
+      <cast_shadows>true</cast_shadows>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <!-- Match factory_walls interior: 12 m × 10 m (inner faces x ±6, y ±5). -->
+              <size>12 10</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>4.0</mu>
+                <mu2>4.0</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <mesh>
+              <uri>model://factory_floor/meshes/floor_plane.obj</uri>
+              <scale>1 1 1</scale>
+            </mesh>
+          </geometry>
+          <material>
+            <ambient>0.5 0.5 0.5 1</ambient>
+            <diffuse>0.7 0.7 0.7 1</diffuse>
+            <specular>0.2 0.2 0.2 1</specular>
+            <pbr>
+              <metal>
+                <albedo_map>model://factory_floor/materials/textures/floor.jpg</albedo_map>
+                <roughness>0.8</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Factory room: 4 walls (interior ~12 m × 10 m, height 3 m). Wall albedo: textures/Gemini_Generated_Image_* → factory_floor/materials/textures/wall.png -->
+    <model name="factory_walls">
+      <static>true</static>
+      <pose>0 0 0 0 0 0</pose>
+      <link name="link">
+        <!-- Inner half-extents: Wx/2=6, Dy/2=5; wall thickness t=0.2. N/S walls span Wx+2t; E/W span Dy+2t for closed corners. -->
+        <collision name="wall_north">
+          <pose>0 5.1 1.5 0 0 0</pose>
+          <geometry>
+            <box><size>12.4 0.2 3</size></box>
+          </geometry>
+        </collision>
+        <visual name="wall_north_vis">
+          <pose>0 5.1 1.5 0 0 0</pose>
+          <geometry>
+            <box><size>12.4 0.2 3</size></box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.12 0.12 0.12 1</specular>
+            <pbr>
+              <metal>
+                <albedo_map>model://factory_floor/materials/textures/wall.png</albedo_map>
+                <roughness>0.85</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+        <collision name="wall_south">
+          <pose>0 -5.1 1.5 0 0 0</pose>
+          <geometry>
+            <box><size>12.4 0.2 3</size></box>
+          </geometry>
+        </collision>
+        <visual name="wall_south_vis">
+          <pose>0 -5.1 1.5 0 0 0</pose>
+          <geometry>
+            <box><size>12.4 0.2 3</size></box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.12 0.12 0.12 1</specular>
+            <pbr>
+              <metal>
+                <albedo_map>model://factory_floor/materials/textures/wall.png</albedo_map>
+                <roughness>0.85</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+        <collision name="wall_east">
+          <pose>6.1 0 1.5 0 0 0</pose>
+          <geometry>
+            <box><size>0.2 10.4 3</size></box>
+          </geometry>
+        </collision>
+        <visual name="wall_east_vis">
+          <pose>6.1 0 1.5 0 0 0</pose>
+          <geometry>
+            <box><size>0.2 10.4 3</size></box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.12 0.12 0.12 1</specular>
+            <pbr>
+              <metal>
+                <albedo_map>model://factory_floor/materials/textures/wall.png</albedo_map>
+                <roughness>0.85</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+        <collision name="wall_west">
+          <pose>-6.1 0 1.5 0 0 0</pose>
+          <geometry>
+            <box><size>0.2 10.4 3</size></box>
+          </geometry>
+        </collision>
+        <visual name="wall_west_vis">
+          <pose>-6.1 0 1.5 0 0 0</pose>
+          <geometry>
+            <box><size>0.2 10.4 3</size></box>
+          </geometry>
+          <material>
+            <ambient>1 1 1 1</ambient>
+            <diffuse>1 1 1 1</diffuse>
+            <specular>0.12 0.12 0.12 1</specular>
+            <pbr>
+              <metal>
+                <albedo_map>model://factory_floor/materials/textures/wall.png</albedo_map>
+                <roughness>0.85</roughness>
+              </metal>
+            </pbr>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Tables and props: spawned from profile YAML (world_props) via ros_gz_sim create; see arm_api2_gui World layout. -->
+  </world>
+</sdf>

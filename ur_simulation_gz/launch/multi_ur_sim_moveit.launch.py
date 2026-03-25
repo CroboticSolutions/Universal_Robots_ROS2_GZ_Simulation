@@ -8,7 +8,14 @@ import yaml
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription, OpaqueFunction, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument,
+    ExecuteProcess,
+    GroupAction,
+    IncludeLaunchDescription,
+    OpaqueFunction,
+    TimerAction,
+)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
@@ -85,6 +92,31 @@ def _validate_world_file(world_file: str) -> str:
     return world_file
 
 
+def _validate_profile_yaml_path(path: str) -> str:
+    """Absolute path to a generated multi-UR profile YAML (GUI / tooling)."""
+    path = path.strip()
+    if not path:
+        raise ValueError("profile_yaml_path is empty")
+    if any(ch in path for ch in FORBIDDEN_WORLD_CHARS):
+        raise ValueError(f"profile_yaml_path contains forbidden characters: {path!r}")
+    normalized = path.replace("\\", "/")
+    if ".." in normalized.split("/"):
+        raise ValueError(f"profile_yaml_path must not contain path traversal '..': {path!r}")
+    if not os.path.isabs(path):
+        raise ValueError(f"profile_yaml_path must be an absolute path, got: {path!r}")
+    if not os.path.isfile(path):
+        raise ValueError(f"profile_yaml_path file not found: {path!r}")
+    return path
+
+
+def _load_profile_from_path(absolute_path: str) -> dict:
+    with open(absolute_path, "r", encoding="utf-8") as file:
+        data = yaml.safe_load(file) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"Profile YAML must be a mapping/object: {absolute_path}")
+    return data
+
+
 def _parse_positions(positions_raw: str, robot_count: int):
     entries = [entry.strip() for entry in positions_raw.split(";") if entry.strip()]
     if len(entries) != robot_count:
@@ -153,6 +185,158 @@ def _parse_profile_positions(positions_raw, robot_count: int):
     return parsed
 
 
+def _parse_world_props(profile: dict) -> list[dict]:
+    """Parse world_props from GUI profile YAML for ros_gz_sim create."""
+    raw = profile.get("world_props")
+    if not isinstance(raw, list) or len(raw) == 0:
+        return []
+    out = []
+    for idx, entry in enumerate(raw, start=1):
+        if not isinstance(entry, dict):
+            raise ValueError(f"world_props entry {idx} must be an object")
+        missing = [
+            key
+            for key in ("name", "model", "x", "y", "z", "roll", "pitch", "yaw")
+            if key not in entry
+        ]
+        if missing:
+            raise ValueError(f"world_props entry {idx} is missing keys: {missing}")
+        name = str(entry["name"])
+        model = str(entry["model"])
+        _validate_ros_name(name, f"world_props[{idx}].name")
+        _validate_ros_name(model, f"world_props[{idx}].model")
+        try:
+            x = float(entry["x"])
+            y = float(entry["y"])
+            z = float(entry["z"])
+            roll = float(entry["roll"])
+            pitch = float(entry["pitch"])
+            yaw = float(entry["yaw"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"world_props entry {idx} contains non-numeric values: {entry!r}") from exc
+        if not all(math.isfinite(v) for v in (x, y, z, roll, pitch, yaw)):
+            raise ValueError(f"world_props entry {idx} contains non-finite values: {entry!r}")
+        out.append(
+            {
+                "name": name,
+                "model": model,
+                "x": x,
+                "y": y,
+                "z": z,
+                "roll": roll,
+                "pitch": pitch,
+                "yaw": yaw,
+            }
+        )
+    return out
+
+
+def _world_prop_sdf_string(name: str, model: str) -> str:
+    """Single-line SDF wrapping model:// include for ros_gz_sim create -string."""
+    return (
+        '<?xml version="1.0"?>'
+        '<sdf version="1.10">'
+        f'<model name="{name}"><static>true</static>'
+        f'<include><uri>model://{model}</uri></include></model>'
+        "</sdf>"
+    )
+
+
+def _matmul3(
+    a: tuple[tuple[float, float, float], ...],
+    b: tuple[tuple[float, float, float], ...],
+) -> tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]]:
+    return tuple(
+        tuple(sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3))
+        for i in range(3)
+    )
+
+
+def _rpy_to_rot_matrix(
+    roll: float, pitch: float, yaw: float
+) -> tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]]:
+    """Rotation from model frame to world: v_world = R @ v_model (same ordering as SDF pose parsing)."""
+    cr, sr = math.cos(roll), math.sin(roll)
+    cp, sp = math.cos(pitch), math.sin(pitch)
+    cy, sy = math.cos(yaw), math.sin(yaw)
+    rx = (
+        (1.0, 0.0, 0.0),
+        (0.0, cr, -sr),
+        (0.0, sr, cr),
+    )
+    ry = (
+        (cp, 0.0, sp),
+        (0.0, 1.0, 0.0),
+        (-sp, 0.0, cp),
+    )
+    rz = (
+        (cy, -sy, 0.0),
+        (sy, cy, 0.0),
+        (0.0, 0.0, 1.0),
+    )
+    return _matmul3(_matmul3(rz, ry), rx)
+
+
+def _mat_vec_mul(
+    m: tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]],
+    v: tuple[float, float, float],
+) -> tuple[float, float, float]:
+    x, y, z = v
+    return (
+        m[0][0] * x + m[0][1] * y + m[0][2] * z,
+        m[1][0] * x + m[1][1] * y + m[1][2] * z,
+        m[2][0] * x + m[2][1] * y + m[2][2] * z,
+    )
+
+
+def _load_world_prop_centroid_offsets() -> dict[str, tuple[float, float, float]]:
+    """Model name -> offset (m) from model origin to visual centroid; see world_prop_centroid_offset_m.yaml."""
+    path = os.path.join(
+        get_package_share_directory("ur_simulation_gz"),
+        "config",
+        "multi_ur",
+        "world_prop_centroid_offset_m.yaml",
+    )
+    if not os.path.isfile(path):
+        return {}
+    with open(path, "r", encoding="utf-8") as file:
+        data = yaml.safe_load(file) or {}
+    raw = data.get("centroid_offset_m")
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, tuple[float, float, float]] = {}
+    for model, val in raw.items():
+        if not isinstance(val, (list, tuple)) or len(val) != 3:
+            continue
+        ox, oy, oz = float(val[0]), float(val[1]), float(val[2])
+        if all(math.isfinite(t) for t in (ox, oy, oz)):
+            out[str(model)] = (ox, oy, oz)
+    return out
+
+
+def _world_prop_spawn_xyz_from_profile_centroid(
+    centroid_offsets: dict[str, tuple[float, float, float]],
+    model: str,
+    x: float,
+    y: float,
+    z: float,
+    roll: float,
+    pitch: float,
+    yaw: float,
+) -> tuple[float, float, float]:
+    """Map profile to ros_gz_sim create pose.
+
+    Profile x,y = desired visual centroid in the horizontal plane (world XY).
+    Profile z = model origin height in world (unchanged from pre-centroid behavior; no Z mesh fix).
+
+    Spawn position = (profile_xy - R*(ox,oy,0), profile_z) with (ox,oy) from YAML (horizontal only).
+    """
+    ox, oy, _ = centroid_offsets.get(model, (0.0, 0.0, 0.0))
+    r_mat = _rpy_to_rot_matrix(roll, pitch, yaw)
+    rx, ry, _ = _mat_vec_mul(r_mat, (ox, oy, 0.0))
+    return (x - rx, y - ry, z)
+
+
 def _load_profile(profile_name: str):
     if profile_name not in PROFILE_TO_FILE:
         raise ValueError(
@@ -175,8 +359,15 @@ def _load_profile(profile_name: str):
 
 
 def launch_setup(context, *args, **kwargs):
-    robots_profile = LaunchConfiguration("robots_profile").perform(context)
-    profile = _load_profile(robots_profile)
+    profile_yaml_path_raw = LaunchConfiguration("profile_yaml_path").perform(context).strip()
+    if profile_yaml_path_raw:
+        validated_path = _validate_profile_yaml_path(profile_yaml_path_raw)
+        profile = _load_profile_from_path(validated_path)
+        # For logging only; named-profile branch sets robots_profile from launch arg
+        robots_profile = validated_path
+    else:
+        robots_profile = LaunchConfiguration("robots_profile").perform(context)
+        profile = _load_profile(robots_profile)
 
     ur_type = str(profile.get("ur_type", LaunchConfiguration("ur_type").perform(context)))
     safety_limits = str(
@@ -415,6 +606,75 @@ def launch_setup(context, *args, **kwargs):
 
         actions.append(robot_group)
 
+    world_props = _parse_world_props(profile)
+    if world_props:
+        gz_world_name = str(profile.get("gz_world_name", "lab_table_coke")).strip()
+        _validate_ros_name(gz_world_name, "gz_world_name")
+        centroid_offsets = _load_world_prop_centroid_offsets()
+        try:
+            spawn_delay = float(profile.get("world_props_spawn_delay_s", 8.0))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("world_props_spawn_delay_s must be a float") from exc
+        if not math.isfinite(spawn_delay) or spawn_delay < 0.0:
+            raise ValueError(f"world_props_spawn_delay_s must be non-negative finite, got: {spawn_delay!r}")
+        try:
+            stagger = float(profile.get("world_props_stagger_s", 0.35))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("world_props_stagger_s must be a float") from exc
+        if not math.isfinite(stagger) or stagger < 0.0:
+            raise ValueError(f"world_props_stagger_s must be non-negative finite, got: {stagger!r}")
+
+        for index, prop in enumerate(world_props):
+            sdf = _world_prop_sdf_string(prop["name"], prop["model"])
+            period = spawn_delay + float(index) * stagger
+            sx, sy, sz = _world_prop_spawn_xyz_from_profile_centroid(
+                centroid_offsets,
+                prop["model"],
+                prop["x"],
+                prop["y"],
+                prop["z"],
+                prop["roll"],
+                prop["pitch"],
+                prop["yaw"],
+            )
+            cmd = [
+                "ros2",
+                "run",
+                "ros_gz_sim",
+                "create",
+                "-world",
+                gz_world_name,
+                "-name",
+                prop["name"],
+                "-string",
+                sdf,
+                "-x",
+                str(sx),
+                "-y",
+                str(sy),
+                "-z",
+                str(sz),
+                "-R",
+                str(prop["roll"]),
+                "-P",
+                str(prop["pitch"]),
+                "-Y",
+                str(prop["yaw"]),
+                "-allow_renaming",
+                "false",
+            ]
+            actions.append(
+                TimerAction(
+                    period=period,
+                    actions=[
+                        ExecuteProcess(
+                            cmd=cmd,
+                            output="screen",
+                        )
+                    ],
+                )
+            )
+
     return actions
 
 
@@ -425,6 +685,14 @@ def generate_launch_description():
                 "robots_profile",
                 default_value="default",
                 description="Multi-robot profile name. Supported: default, lab, lab_gripper, lab_gripper_5, lab_gripper_6, stress10.",
+            ),
+            DeclareLaunchArgument(
+                "profile_yaml_path",
+                default_value="",
+                description=(
+                    "If non-empty, absolute path to a YAML file to use instead of robots_profile "
+                    "(e.g. generated by arm_api2_gui). Empty uses robots_profile as before."
+                ),
             ),
             DeclareLaunchArgument(
                 "per_robot_start_delay_s",
