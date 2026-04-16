@@ -3,7 +3,8 @@
 # Spawn: xy = profile_xy - R(roll,pitch,yaw) * (ox, oy, 0); z = profile_z.
 # Regenerate with: python3 scripts/compute_world_prop_centroid_offsets.py (uses full xyz from mesh; keep xy here)
 centroid_offset_m:
-  Table: [-0.398047479547, 0.556486909841, 0.281115244787]
+  # Table mesh scale 0.001 (2× 0.0005): centroid offset scaled to match; re-run compute script to refine.
+  Table: [-0.796094959094, 1.112973819682, 0.562230489574]
   Coke: [-0.001547545714, -0.000000731429, 0.095387808571]
   Banana: [-0.001292651198, 0.001589832317, 0.116823580043]
   Gear: [0.000000001447, 0.000000000907, 0.005888205281]

@@ -4,15 +4,15 @@
     <static>true</static>
     <!-- Visual: CAD mesh. Collision: single tabletop box only. -->
     <link name="tabletop">
-      <!-- Tabletop slab center: 2.5 cm above ground → top surface z ≈ 0.05 m in model frame. -->
-      <pose>0 0 0.025 0 0 0</pose>
+      <!-- Mesh scale 0.001 (2× former 0.0005): link origin lifted so base matches doubled mesh. -->
+      <pose>0 0 0.05 0 0 0</pose>
 
       <visual name="cad_mesh">
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <mesh>
             <uri>model://Table/meshes/stainless_steel_table.stl</uri>
-            <scale>0.0005 0.0005 0.0005</scale>
+            <scale>0.001 0.001 0.001</scale>
           </mesh>
         </geometry>
         <material>
@@ -23,12 +23,12 @@
         </material>
       </visual>
 
-      <!-- Tabletop collision (same footprint as before). -->
+      <!-- Tabletop collision: 2× linear dims vs 0.0005 scale (matches 0.001 mesh scale). -->
       <collision name="top_plate">
-        <pose>-0.4 0.55 0.44 0 0 -1.5708</pose>
+        <pose>-0.8 1.1 0.88 0 0 -1.5708</pose>
         <geometry>
           <box>
-            <size>1.1 0.45 0.05</size>
+            <size>2.2 0.9 0.1</size>
           </box>
         </geometry>
         <surface>

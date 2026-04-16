@@ -1,0 +1,17 @@
+# Jedan UR5e s Robotiq 2F-85 na laboratorijskom stolu (isti layout kao prvi robot u lab_gripper.yaml).
+camera_gz_robots: [ur1]
+ur_type: ur5e
+semantic_description_file: srdf/ur_robotiq.srdf.xacro
+gazebo_gui: "true"
+world_file: lab_table_one.sdf
+gz_world_name: lab_table_coke
+robot_namespace_prefix: ur
+launch_rviz_first_robot: "true"
+launch_servo: "false"
+publish_robot_description_semantic: "true"
+use_robotiq_gripper: "true"
+robot_positions:
+  - x: 0.2
+    y: -0.1
+    z: 1.0
+    yaw: 1.7

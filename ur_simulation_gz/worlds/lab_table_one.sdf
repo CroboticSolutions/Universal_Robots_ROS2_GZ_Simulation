@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
-<!-- Static tables + props for multi-UR / gripper lab. Factory: textured walls + ground_plane (factory_floor assets). ur1 @ (0,0); ur2 table @ +2 X. -->
-<!-- World plugins: gz-sim-sensors-system + ogre2 required for RGB/RGB-D camera rendering (see gz-sim sensors_demo). -->
+<!-- Same lab room as lab_table_coke.sdf: factory floor, walls, one Table only (no Coke, tools, second table, or ur2 props). -->
+<!-- World plugins: gz-sim-sensors-system + ogre2 required for RGB/RGB-D camera rendering. -->
+<!-- Keep <world name="lab_table_coke"> so /world/lab_table_coke/... topics match config/ur_gz_bridge.yaml. -->
 <sdf version="1.10">
   <world name="lab_table_coke">
     <physics type="ode">
@@ -18,7 +19,6 @@
     <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
     <plugin filename="gz-sim-contact-system" name="gz::sim::systems::Contact"/>
 
-    <!-- Bez izvora svjetla vizuali bez materijala izgledaju gotovo crno. -->
     <scene>
       <ambient>0.5 0.5 0.52 1</ambient>
       <background>0.8 0.85 0.9 1</background>
@@ -39,7 +39,6 @@
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <!-- Match factory_walls interior: 12 m × 10 m (inner faces x ±6, y ±5). -->
               <size>12 10</size>
             </plane>
           </geometry>
@@ -74,12 +73,10 @@
       </link>
     </model>
 
-    <!-- Factory room: 4 walls (interior ~12 m × 10 m, height 3 m). Wall albedo: textures/Gemini_Generated_Image_* → factory_floor/materials/textures/wall.png -->
     <model name="factory_walls">
       <static>true</static>
       <pose>0 0 0 0 0 0</pose>
       <link name="link">
-        <!-- Inner half-extents: Wx/2=6, Dy/2=5; wall thickness t=0.2. N/S walls span Wx+2t; E/W span Dy+2t for closed corners. -->
         <collision name="wall_north">
           <pose>0 5.1 1.5 0 0 0</pose>
           <geometry>
@@ -181,54 +178,46 @@
       <pose>1 -0.55 0 0 0 0</pose>
     </include>
 
-    <include>
-      <uri>model://Coke</uri>
-      <name>coke_can</name>
-      <!-- On tabletop (Table model mesh scale 0.001; can center above ~0.98 m surface). -->
-      <pose>0.55 -0.1 0.99 0 0 0</pose>
-    </include>
-
-    <!-- Props next to Coke (package models: Banana, Gear, Wrench) -->
-    <include>
-      <uri>model://Banana</uri>
-      <name>banana_1</name>
-      <pose>0.55 0.4 1.01 1.57 1.57 0</pose>
-    </include>
-
-    <include>
-      <uri>model://Gear</uri>
-      <name>gear_1</name>
-      <pose>0.55 -0.3 0.99 0 0 0</pose>
-    </include>
-
-    <include>
-      <uri>model://Wrench</uri>
-      <name>wrench_1</name>
-      <pose>0.62 0.06 0.99 0 0 0</pose>
-    </include>
-
-    <!-- Second table in front of ur2 (base ~ x=2 per lab_gripper robot_positions); same layout offset as lab_table vs ur1 -->
-    <include>
-      <uri>model://Table</uri>
-      <name>lab_table_ur2</name>
-      <pose>3 -0.55 0 0 0 0</pose>
-    </include>
-
-    <!-- Static props on ur2 table (Drone/Car/Drill/Hammer — models use static in model.sdf where needed) -->
-    <include>
-      <uri>model://Drone</uri>
-      <name>ur2_prop_drone</name>
-      <pose>2.58 -0.2 1.03 0 0 3.14</pose>
-    </include>
-    <include>
-      <uri>model://Drill</uri>
-      <name>ur2_prop_drill</name>
-      <pose>2.58 0.05 0.98 0 0 0</pose>
-    </include>
-    <include>
-      <uri>model://Hammer</uri>
-      <name>ur2_prop_hammer</name>
-      <pose>2.68 0.3 1.0 0 0 -1.57</pose>
-    </include>
+    <!-- Dynamic cube on tabletop (Table mesh scale 0.001: surface z ≈ 0.98 m here). -->
+    <model name="grasp_cube_red">
+      <static>false</static>
+      <pose>0.4 0.55 1.0 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>0.08</mass>
+          <inertia>
+            <ixx>2.133e-5</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>2.133e-5</iyy>
+            <iyz>0</iyz>
+            <izz>2.133e-5</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box><size>0.04 0.04 0.04</size></box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>1.0</mu>
+                <mu2>1.0</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.04 0.04 0.04</size></box>
+          </geometry>
+          <material>
+            <ambient>0.85 0.1 0.1 1</ambient>
+            <diffuse>0.9 0.15 0.12 1</diffuse>
+            <specular>0.3 0.2 0.2 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
   </world>
 </sdf>

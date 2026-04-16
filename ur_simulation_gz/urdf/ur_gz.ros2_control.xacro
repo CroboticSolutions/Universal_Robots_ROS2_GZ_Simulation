@@ -25,7 +25,7 @@
         initial_positions="${initial_positions}"
       />
       <xacro:if value="${use_robotiq_gripper == True or use_robotiq_gripper == 'true'}">
-        <!-- Robotiq 2F-85: single actuated joint; mimic joints follow in Gazebo + gz_ros2_control -->
+        <!-- Robotiq sim: single prismatic (m); q=0 open. Right jaw follows via URDF mimic. -->
         <joint name="${tf_prefix}robotiq_85_left_knuckle_joint">
           <command_interface name="position"/>
           <state_interface name="position">

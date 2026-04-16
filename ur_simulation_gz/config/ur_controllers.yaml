@@ -224,7 +224,7 @@ robotiq_gripper_controller:
       - velocity
     allow_stalling: true
     stall_timeout: 0.05
-    goal_tolerance: 0.02
+    goal_tolerance: 0.003
 
 /**/robotiq_gripper_controller:
   ros__parameters:
@@ -234,4 +234,4 @@ robotiq_gripper_controller:
       - velocity
     allow_stalling: true
     stall_timeout: 0.05
-    goal_tolerance: 0.02
+    goal_tolerance: 0.003

@@ -79,7 +79,8 @@
 
   <xacro:if value="${use_rq_gripper == True or use_rq_gripper == 'true'}">
     <xacro:include filename="$(find robotiq_description)/urdf/ur_to_robotiq_adapter.urdf.xacro" />
-    <xacro:include filename="$(find robotiq_description)/urdf/robotiq_2f_85_macro.urdf.xacro" />
+    <!-- Gazebo: two rigid jaws + one mimic (see robotiq_2f_85_simple_parallel.urdf.xacro). -->
+    <xacro:include filename="$(find ur_simulation_gz)/urdf/robotiq_2f_85_simple_parallel.urdf.xacro" />
     <xacro:ur_to_robotiq
       prefix="$(arg tf_prefix)"
       parent="$(arg tf_prefix)tool0"

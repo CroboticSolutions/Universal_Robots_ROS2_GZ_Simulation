@@ -29,6 +29,7 @@ PROFILE_TO_FILE = {
     "lab_gripper": "lab_gripper.yaml",
     "lab_gripper_5": "lab_gripper_5.yaml",
     "lab_gripper_6": "lab_gripper_6.yaml",
+    "lab_gripper_one": "lab_gripper_one.yaml",
     "stress10": "stress10.yaml",
 }
 
@@ -684,7 +685,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "robots_profile",
                 default_value="default",
-                description="Multi-robot profile name. Supported: default, lab, lab_gripper, lab_gripper_5, lab_gripper_6, stress10.",
+                description="Multi-robot profile name. Supported: default, lab, lab_gripper, lab_gripper_one, lab_gripper_5, lab_gripper_6, stress10.",
             ),
             DeclareLaunchArgument(
                 "profile_yaml_path",
