@@ -178,25 +178,49 @@
       <pose>1 -0.55 0 0 0 0</pose>
     </include>
 
-    <!-- Dynamic cube on tabletop (Table mesh scale 0.001: surface z ≈ 0.98 m here). -->
+    <!-- Static black riser: full tabletop footprint (Table top_plate 2.2 x 0.9 m in world XY ≈ Y x X).
+         Center (0.2, 0.55); tabletop z ≈ 0.98 m, h=0.20 m → center z=1.08, top z=1.18. -->
+    <model name="grasp_cube_platform">
+      <static>true</static>
+      <pose>0.2 0.55 1.08 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.9 0.5 0.2</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.9 0.5 0.2</size></box>
+          </geometry>
+          <material>
+            <ambient>0.05 0.05 0.05 1</ambient>
+            <diffuse>0.06 0.06 0.06 1</diffuse>
+            <specular>0.12 0.12 0.12 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Dynamic cubes on black platform (original layout: x=0.4, y row 0.55/0.45/0.35; z = 1.21). -->
     <model name="grasp_cube_red">
       <static>false</static>
-      <pose>0.4 0.55 1.0 0 0 0</pose>
+      <pose>0.4 0.55 1.21 0 0 0</pose>
       <link name="link">
         <inertial>
-          <mass>0.08</mass>
+          <mass>0.27</mass>
           <inertia>
-            <ixx>2.133e-5</ixx>
+            <ixx>1.62e-4</ixx>
             <ixy>0</ixy>
             <ixz>0</ixz>
-            <iyy>2.133e-5</iyy>
+            <iyy>1.62e-4</iyy>
             <iyz>0</iyz>
-            <izz>2.133e-5</izz>
+            <izz>1.62e-4</izz>
           </inertia>
         </inertial>
         <collision name="collision">
           <geometry>
-            <box><size>0.04 0.04 0.04</size></box>
+            <box><size>0.06 0.06 0.06</size></box>
           </geometry>
           <surface>
             <friction>
@@ -209,12 +233,96 @@
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>0.04 0.04 0.04</size></box>
+            <box><size>0.06 0.06 0.06</size></box>
           </geometry>
           <material>
             <ambient>0.85 0.1 0.1 1</ambient>
             <diffuse>0.9 0.15 0.12 1</diffuse>
             <specular>0.3 0.2 0.2 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Blue cube beside red (offset −Y on tabletop; centers spaced 0.1 m). -->
+    <model name="grasp_cube_blue">
+      <static>false</static>
+      <pose>0.4 0.45 1.21 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>0.27</mass>
+          <inertia>
+            <ixx>1.62e-4</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>1.62e-4</iyy>
+            <iyz>0</iyz>
+            <izz>1.62e-4</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box><size>0.06 0.06 0.06</size></box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>1.0</mu>
+                <mu2>1.0</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.06 0.06 0.06</size></box>
+          </geometry>
+          <material>
+            <ambient>0.1 0.25 0.85 1</ambient>
+            <diffuse>0.15 0.35 0.95 1</diffuse>
+            <specular>0.25 0.25 0.35 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Yellow cube beside blue (offset −Y on tabletop). -->
+    <model name="grasp_cube_yellow">
+      <static>false</static>
+      <pose>0.4 0.35 1.21 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>0.27</mass>
+          <inertia>
+            <ixx>1.62e-4</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>1.62e-4</iyy>
+            <iyz>0</iyz>
+            <izz>1.62e-4</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box><size>0.06 0.06 0.06</size></box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>1.0</mu>
+                <mu2>1.0</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.06 0.06 0.06</size></box>
+          </geometry>
+          <material>
+            <ambient>0.9 0.82 0.1 1</ambient>
+            <diffuse>0.95 0.88 0.15 1</diffuse>
+            <specular>0.35 0.35 0.2 1</specular>
           </material>
         </visual>
       </link>

@@ -18,6 +18,7 @@ from launch.actions import (
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -486,6 +487,20 @@ def launch_setup(context, *args, **kwargs):
         "moveit_start_delay_s",
     )
 
+    publish_moveit_table_collision = (
+        str(profile.get("publish_moveit_table_collision", "false")).lower() == "true"
+    )
+    try:
+        moveit_table_collision_extra_delay_s = float(
+            profile.get("moveit_table_collision_extra_delay_s", 10.0)
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError("moveit_table_collision_extra_delay_s must be a float") from exc
+    if not math.isfinite(moveit_table_collision_extra_delay_s) or moveit_table_collision_extra_delay_s < 0.0:
+        raise ValueError(
+            f"moveit_table_collision_extra_delay_s must be non-negative finite, got: {moveit_table_collision_extra_delay_s!r}"
+        )
+
     robot_count = _parse_optional_robot_count(profile.get("robot_count"))
     if robot_count is None:
         raw_positions = profile.get("robot_positions", [])
@@ -606,6 +621,30 @@ def launch_setup(context, *args, **kwargs):
         )
 
         actions.append(robot_group)
+
+    if publish_moveit_table_collision:
+        for index in range(robot_count):
+            robot_namespace = f"{namespace_prefix}{index + 1}"
+            _validate_ros_name(robot_namespace, "robot_namespace")
+            start_offset = float(index) * per_robot_start_delay_s
+            table_timer_period = (
+                start_offset + moveit_start_delay_s + moveit_table_collision_extra_delay_s
+            )
+            actions.append(
+                TimerAction(
+                    period=table_timer_period,
+                    actions=[
+                        Node(
+                            package="ur_simulation_gz",
+                            executable="publish_moveit_table_collision",
+                            name="publish_moveit_table_collision",
+                            namespace=robot_namespace,
+                            parameters=[{"use_sim_time": True}],
+                            output="screen",
+                        )
+                    ],
+                )
+            )
 
     world_props = _parse_world_props(profile)
     if world_props:

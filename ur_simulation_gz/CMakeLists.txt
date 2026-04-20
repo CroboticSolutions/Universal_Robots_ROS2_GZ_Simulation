@@ -14,6 +14,18 @@ install(DIRECTORY config doc launch urdf worlds models scripts
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(
+  PROGRAMS scripts/ur1_pick_place_sequence.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME ur1_pick_place_sequence
+)
+
+install(
+  PROGRAMS scripts/publish_moveit_table_collision.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME publish_moveit_table_collision
+)
+
 if(BUILD_TESTING)
   find_package(launch_testing_ament_cmake)
   find_package(ament_cmake_pytest REQUIRED)

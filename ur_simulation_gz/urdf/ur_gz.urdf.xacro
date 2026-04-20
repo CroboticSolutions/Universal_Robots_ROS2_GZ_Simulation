@@ -28,8 +28,14 @@
   <xacro:arg name="use_robotiq_gripper" default="false" />
   <!-- When true, spawn Gazebo rgbd_camera on camera_link (multi-UR: only selected namespaces). -->
   <xacro:arg name="camera_gz_enabled" default="false" />
+  <!-- Base pose in world (must match profile spawn_*; Gazebo create uses 0,0,0 so TF matches sim). -->
+  <xacro:arg name="spawn_x" default="0.0" />
+  <xacro:arg name="spawn_y" default="0.0" />
+  <xacro:arg name="spawn_z" default="0.0" />
+  <xacro:arg name="spawn_yaw" default="0.0" />
 
   <xacro:property name="use_rq_gripper" value="$(arg use_robotiq_gripper)" />
+  <xacro:property name="cam_gz_enabled" value="$(arg camera_gz_enabled)" />
 
   <xacro:include filename="$(find ur_simulation_gz)/urdf/ur_camera_macro.xacro"/>
 
@@ -74,7 +80,7 @@
     safety_k_position="$(arg safety_k_position)"
     force_abs_paths="true"
     >
-    <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
+    <origin xyz="$(arg spawn_x) $(arg spawn_y) $(arg spawn_z)" rpy="0 0 $(arg spawn_yaw)" />
   </xacro:ur_robot>
 
   <xacro:if value="${use_rq_gripper == True or use_rq_gripper == 'true'}">
@@ -98,12 +104,14 @@
     </xacro:robotiq_gripper>
   </xacro:if>
 
-  <!-- Wrist RGB-D (Piper-style): links + optical TF for all; Gazebo rgbd_camera if camera_gz_enabled:=true -->
-  <xacro:ur_wrist_rgb_camera
-    tf_prefix="$(arg tf_prefix)"
-    parent_link="$(arg tf_prefix)tool0"
-    camera_gz_enabled="$(arg camera_gz_enabled)"
-  />
+  <!-- Wrist RGB-D: entire camera_link + Gazebo sensor only when camera_gz_enabled:=true (see multi_ur camera_gz_robots). -->
+  <xacro:if value="${cam_gz_enabled == True or cam_gz_enabled == 'true'}">
+    <xacro:ur_wrist_rgb_camera
+      tf_prefix="$(arg tf_prefix)"
+      parent_link="$(arg tf_prefix)tool0"
+      camera_gz_enabled="$(arg camera_gz_enabled)"
+    />
+  </xacro:if>
 
   <gazebo reference="world">
   </gazebo>

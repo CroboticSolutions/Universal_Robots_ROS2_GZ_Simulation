@@ -1,5 +1,6 @@
 # Jedan UR5e s Robotiq 2F-85 na laboratorijskom stolu (isti layout kao prvi robot u lab_gripper.yaml).
-camera_gz_robots: [ur1]
+# Bez Gazebo RGB-D kamere na robotu: ostavi prazno ili izbaci ključ (vidi lab_gripper.yaml za [ur1, ur2]).
+camera_gz_robots: []
 ur_type: ur5e
 semantic_description_file: srdf/ur_robotiq.srdf.xacro
 gazebo_gui: "true"
@@ -14,4 +15,8 @@ robot_positions:
   - x: 0.2
     y: -0.1
     z: 1.0
-    yaw: 1.7
+    yaw: 1.57
+
+# Add Gazebo lab_table tabletop as a MoveIt collision box (matches model://Table in lab_table_one.sdf).
+publish_moveit_table_collision: "true"
+moveit_table_collision_extra_delay_s: 12.0

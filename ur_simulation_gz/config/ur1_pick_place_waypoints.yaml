@@ -1,0 +1,24 @@
+# Poses for ur1_pick_place_sequence.py — sve u planning_frame (npr. world).
+# Zamijeni vrijednosti vlastitim lokacijama (m, kvaternioni).
+planning_frame: world
+seconds_per_move: 12.0
+
+poses:
+  predrop0:
+    position: {x: 0.6157, y: -0.2833, z: 0.55}
+    orientation: {x: 0.7017, y: 0.7017, z: 0.0, w: 0.0}
+  drop0:
+    position: {x: 0.6157, y: -0.2833, z: 0.1664}
+    orientation: {x: 0.0, y: 0.7107, z: 0.0, w: 0.0}
+  postdrop0:
+    position: {x: 0.3, y: -0.2, z: 0.6}
+    orientation: {x: 0.0, y: 0.9238795, z: 0.0, w: 0.3826834}
+  predrop1:
+    position: {x: 0.25, y: 0.1, z: 0.55}
+    orientation: {x: 0.0, y: 0.9238795, z: 0.0, w: 0.3826834}
+  drop1:
+    position: {x: 0.3, y: 0.1, z: 0.45}
+    orientation: {x: 0.0, y: 0.9238795, z: 0.0, w: 0.3826834}
+  postdrop1:
+    position: {x: 0.25, y: 0.1, z: 0.6}
+    orientation: {x: 0.0, y: 0.9238795, z: 0.0, w: 0.3826834}

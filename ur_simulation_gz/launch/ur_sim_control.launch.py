@@ -169,6 +169,18 @@ def launch_setup(context, *args, **kwargs):
             " ",
             "camera_gz_enabled:=",
             camera_gz_enabled,
+            " ",
+            "spawn_x:=",
+            spawn_x,
+            " ",
+            "spawn_y:=",
+            spawn_y,
+            " ",
+            "spawn_z:=",
+            spawn_z,
+            " ",
+            "spawn_yaw:=",
+            spawn_yaw,
         ]
     )
     robot_state_publisher_node = Node(
@@ -344,6 +356,8 @@ def launch_setup(context, *args, **kwargs):
     # endregion
 
     # GZ nodes
+    # Pose is encoded in URDF (spawn_* → ur_gz.urdf.xacro world→arm origin). Spawn at origin here
+    # so Gazebo matches robot_state_publisher TF (no double transform).
     gz_spawn_entity = Node(
         package="ros_gz_sim",
         executable="create",
@@ -354,13 +368,13 @@ def launch_setup(context, *args, **kwargs):
             "-name",
             robot_name,
             "-x",
-            spawn_x,
+            "0.0",
             "-y",
-            spawn_y,
+            "0.0",
             "-z",
-            spawn_z,
+            "0.0",
             "-Y",
-            spawn_yaw,
+            "0.0",
             "-allow_renaming",
             "false",
         ],
