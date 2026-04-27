@@ -235,10 +235,12 @@ def _parse_world_props(profile: dict) -> list[dict]:
 
 def _world_prop_sdf_string(name: str, model: str) -> str:
     """Single-line SDF wrapping model:// include for ros_gz_sim create -string."""
+    is_coke_can = name == "coke_can" or model == "Coke"
+    static_value = "false" if is_coke_can else "true"
     return (
         '<?xml version="1.0"?>'
         '<sdf version="1.10">'
-        f'<model name="{name}"><static>true</static>'
+        f'<model name="{name}"><static>{static_value}</static>'
         f'<include><uri>model://{model}</uri></include></model>'
         "</sdf>"
     )
