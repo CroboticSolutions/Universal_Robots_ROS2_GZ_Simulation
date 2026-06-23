@@ -219,6 +219,9 @@ forward_position_controller:
 robotiq_gripper_controller:
   ros__parameters:
     joint: robotiq_85_left_knuckle_joint
+    # parallel_gripper_action_controller exposes control_msgs/ParallelGripperCommand.
+    # MoveIt drives it via a controller of type ParallelGripperCommand (see moveit_controllers.yaml).
+    # NOTE: position_controllers/GripperActionController is deprecated in Jazzy and SEGFAULTS on activate.
     state_interfaces:
       - position
       - velocity
@@ -229,6 +232,9 @@ robotiq_gripper_controller:
 /**/robotiq_gripper_controller:
   ros__parameters:
     joint: robotiq_85_left_knuckle_joint
+    # parallel_gripper_action_controller exposes control_msgs/ParallelGripperCommand.
+    # MoveIt drives it via a controller of type ParallelGripperCommand (see moveit_controllers.yaml).
+    # NOTE: position_controllers/GripperActionController is deprecated in Jazzy and SEGFAULTS on activate.
     state_interfaces:
       - position
       - velocity

@@ -28,6 +28,8 @@
 #
 # Author: Denis Stogl
 
+import os
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -64,6 +66,8 @@ def launch_setup(context, *args, **kwargs):
         }.items(),
     )
 
+    moveit_start_delay_s = LaunchConfiguration("moveit_start_delay_s")
+
     ur_moveit_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(moveit_launch_file),
         launch_arguments={
@@ -71,6 +75,12 @@ def launch_setup(context, *args, **kwargs):
             "use_sim_time": "true",
             "launch_rviz": "true",
             "semantic_description_file": semantic_description_file,
+            "publish_robot_description_semantic": "true",
+            "robot_description_topic": "robot_description",
+            "robot_model_name": "ur",
+            "warehouse_sqlite_path": os.path.expanduser("~/.ros/warehouse_ros.sqlite"),
+            "launch_servo": "false",
+            "moveit_start_delay_s": moveit_start_delay_s,
         }.items(),
     )
 
@@ -171,6 +181,13 @@ def generate_launch_description():
                 "Forwarded to ur_sim_control (`gz sim --physics-engine`). "
                 "Bullet-Featherstone supports URDF mimic (Robotiq); use gz-physics-dartsim-plugin for legacy behavior."
             ),
+        )
+    )
+    declared_arguments.append(
+        DeclareLaunchArgument(
+            "moveit_start_delay_s",
+            default_value="8.0",
+            description="Delay (s) before starting MoveIt/RViz so Gazebo controllers are active.",
         )
     )
 
