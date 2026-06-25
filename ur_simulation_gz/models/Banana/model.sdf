@@ -1,7 +1,7 @@
 <?xml version='1.0' ?>
 <sdf version="1.6">
     <model name="Banana for Scale">
-        <static>true</static>
+        <static>false</static>
         <link name="link">
             <!-- ~120 g fruit; COM near mesh anchor. Inertia: uniform box sx=0.22 sy=0.06 sz=0.06 m (bounding approx). -->
             <inertial>
@@ -16,13 +16,13 @@
                     <izz>5.11e-04</izz>
                 </inertia>
             </inertial>
-            <!-- Mesh collision matches visual; if Bullet segfaults in GImpact BVH, use a box here instead. -->
+            <!-- Primitive box aligned with visual pose; ~bounding volume per inertial comment (0.22×0.06×0.06 m). -->
             <collision name="collision">
                 <pose>0 0 0.12 0 0 1.5708</pose>
                 <geometry>
-                    <mesh>
-                        <uri>meshes/Banana.dae</uri>
-                    </mesh>
+                    <box>
+                        <size>0.22 0.06 0.06</size>
+                    </box>
                 </geometry>
             </collision>
             <visual name="visual">

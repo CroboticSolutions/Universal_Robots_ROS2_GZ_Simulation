@@ -4,7 +4,8 @@
 
 1. **Profile** — In `config/multi_ur/<profile>.yaml` set:
    - `camera_gz_robots: [ur1, ur2]` — only these namespaces get a Gazebo `rgbd_camera` (sensor name `camera`, Piper-style URDF) and bridged ROS topics.
-2. **Bridge (Piper-style)** — Single `ros_gz_bridge` `parameter_bridge` node (`gz_bridge`) loads **`config/ur_gz_bridge.yaml`**: `/clock` plus per-robot `image_raw`, `camera_info`, and `points` (PointCloud2). It starts when the first stack launches Gazebo (`launch_gz_world:=true`).
+2. **Bridge (Piper-style)** — Single `ros_gz_bridge` `parameter_bridge` node (`gz_bridge`) loads **`config/ur_gz_bridge.yaml`**: `/clock` plus per-robot `image_raw`, `camera_info`, and `points` (PointCloud2). It starts when the first stack launches Gazebo (`launch_gz_world:=true`).  
+   **`gz_topic_name` must match `gz topic -l`** (world name, model name, link name). If the stream is black / WebRTC logs `No frame`, the bridge path is wrong — often `.../wrist_3_link/...` vs `.../camera_link/...` depending on how the model is exported.
 3. **World name** — YAML uses gz topics under `/world/lab_table_coke/...`. If you change the world file, update `<world name="...">` in that SDF and the `gz_topic_name` entries to match `gz topic -l`.
 4. **ROS topics** (after bridge):
    - `/clock`

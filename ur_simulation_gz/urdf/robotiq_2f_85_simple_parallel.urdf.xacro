@@ -231,5 +231,14 @@
             <limit lower="0.0" upper="${robotiq_prismatic_stroke}" effort="50" velocity="0.5" />
             <mimic joint="${prefix}robotiq_85_left_knuckle_joint" multiplier="1" />
         </joint>
+
+        <!-- Virtual TCP at the centerline between the finger pads. Use this for Cartesian grasp targets;
+             tool0 remains the robot flange frame and is not the physical grasp point. -->
+        <link name="${prefix}robotiq_tcp" />
+        <joint name="${prefix}robotiq_tcp_joint" type="fixed">
+            <parent link="${prefix}robotiq_85_base_link" />
+            <child link="${prefix}robotiq_tcp" />
+            <origin xyz="0 0 0.145" rpy="0 0 0" />
+        </joint>
     </xacro:macro>
 </robot>

@@ -235,8 +235,17 @@ def _parse_world_props(profile: dict) -> list[dict]:
 
 def _world_prop_sdf_string(name: str, model: str) -> str:
     """Single-line SDF wrapping model:// include for ros_gz_sim create -string."""
-    is_coke_can = name == "coke_can" or model == "Coke"
-    static_value = "false" if is_coke_can else "true"
+    is_dynamic = model in (
+        "Coke",
+        "GraspCube",
+        "Banana",
+        "Gear",
+        "Wrench",
+        "Drone",
+        "Drill",
+        "Hammer",
+    ) or name == "coke_can"
+    static_value = "false" if is_dynamic else "true"
     return (
         '<?xml version="1.0"?>'
         '<sdf version="1.10">'
@@ -294,7 +303,10 @@ def _mat_vec_mul(
 
 
 def _load_world_prop_centroid_offsets() -> dict[str, tuple[float, float, float]]:
-    """Model name -> offset (m) from model origin to visual centroid; see world_prop_centroid_offset_m.yaml."""
+    """Model name -> offset (m) from model origin to spawn XY anchor; see world_prop_centroid_offset_m.yaml.
+
+    Table uses the ``top_plate`` collision box center; other models use the primary visual centroid (XY).
+    """
     path = os.path.join(
         get_package_share_directory("ur_simulation_gz"),
         "config",
@@ -330,8 +342,8 @@ def _world_prop_spawn_xyz_from_profile_centroid(
 ) -> tuple[float, float, float]:
     """Map profile to ros_gz_sim create pose.
 
-    Profile x,y = desired visual centroid in the horizontal plane (world XY).
-    Profile z = model origin height in world (unchanged from pre-centroid behavior; no Z mesh fix).
+    Profile x,y = desired horizontal anchor in world XY (tabletop collision center for Table;
+    visual centroid for other props). Profile z = model origin height in world (unchanged).
 
     Spawn position = (profile_xy - R*(ox,oy,0), profile_z) with (ox,oy) from YAML (horizontal only).
     """

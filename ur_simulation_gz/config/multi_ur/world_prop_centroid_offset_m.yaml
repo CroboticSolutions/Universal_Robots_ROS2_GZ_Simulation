@@ -1,11 +1,12 @@
-# Horizontal (XY) only: vector from model origin to mesh centroid in X and Y (model frame, meters).
-# Z is ignored for spawn correction; profile z is model origin height (same as before centroid work).
-# Spawn: xy = profile_xy - R(roll,pitch,yaw) * (ox, oy, 0); z = profile_z.
-# Regenerate with: python3 scripts/compute_world_prop_centroid_offsets.py (uses full xyz from mesh; keep xy here)
+# Spawn correction: vector from Gazebo model origin to horizontal anchor in model frame (meters).
+# Launch uses XY only: spawn_xy = profile_xy - R(roll,pitch,yaw) * (ox, oy); profile z = model-origin height.
+# Table: anchor = geometric center of collision top_plate (matches physics/MoveIt), not STL centroid.
+# Regenerate: python3 scripts/compute_world_prop_centroid_offsets.py
 centroid_offset_m:
-  # Table mesh scale 0.001 (2× 0.0005): centroid offset scaled to match; re-run compute script to refine.
-  Table: [-0.796094959094, 1.112973819682, 0.562230489574]
+  Table: [-0.8, 1.1, 0.93]
   Coke: [-0.001547545714, -0.000000731429, 0.095387808571]
+  # Primitive box; origin at bottom center — XY centroid matches origin (Z in YAML unused for spawn XY).
+  GraspCube: [0.0, 0.0, 0.0225]
   Banana: [-0.001292651198, 0.001589832317, 0.116823580043]
   Gear: [0.000000001447, 0.000000000907, 0.005888205281]
   Wrench: [0.146442134461, 0.042036031152, 0.013090148368]

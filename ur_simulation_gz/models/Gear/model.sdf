@@ -1,6 +1,7 @@
 <?xml version="1.0" ?>
 <sdf version="1.6">
   <model name="gear_part">
+    <static>false</static>
     <link name="link">
       <inertial>
         <pose>0 0 0.005875 0 0 0</pose>

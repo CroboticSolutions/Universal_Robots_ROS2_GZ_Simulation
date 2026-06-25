@@ -6,7 +6,7 @@
     <link name="body">
       <pose>0 0 0 0 0 0</pose>
 
-        <!-- Same scale on visual + collision. Tune s (uniform xyz). -->
+        <!-- Mesh visual; scale uniforms < 1 shrink toward ~real can size vs raw OBJ. -->
         <visual name="visual">
           <geometry>
             <mesh>
@@ -16,13 +16,14 @@
           </geometry>
         </visual>
 
-        <!-- Box primitive: ~ former cylinder bounds (0.066 ≈ 2×0.033), height 0.115. -->
+        <!-- Cylinder: h=0.14 m (ex-box); Ø=0.05 m → r=0.025 m. Axis +Z; bottom at link z=0. -->
         <collision name="collision">
           <pose>0 0 0.07 0 0 0</pose>
           <geometry>
-            <box>
-              <size>0.055 0.055 0.14</size>
-            </box>
+            <cylinder>
+              <radius>0.025</radius>
+              <length>0.14</length>
+            </cylinder>
           </geometry>
           <surface>
             <friction>
@@ -34,17 +35,17 @@
           </surface>
         </collision>
 
-        <!-- Inertia for uniform box m=0.345, size 0.066×0.066×0.115 (Z up). -->
+        <!-- Inertia: solid cylinder m=0.345, r=0.025, h=0.14 (Z up). -->
         <inertial>
-          <pose>0 0 0.0575 0 0 0</pose>
+          <pose>0 0 0.07 0 0 0</pose>
           <mass>0.345</mass>
           <inertia>
-            <ixx>0.000505</ixx>
+            <ixx>0.000617</ixx>
             <ixy>0</ixy>
             <ixz>0</ixz>
-            <iyy>0.000505</iyy>
+            <iyy>0.000617</iyy>
             <iyz>0</iyz>
-            <izz>0.000250</izz>
+            <izz>0.000108</izz>
           </inertia>
         </inertial>
     </link>

@@ -214,7 +214,7 @@
       <pose>3 -0.55 0 0 0 0</pose>
     </include>
 
-    <!-- Static props on ur2 table (Drone/Car/Drill/Hammer — models use static in model.sdf where needed) -->
+    <!-- Dynamic props on ur2 table (Drone/Drill/Hammer — physics via model.sdf static=false) -->
     <include>
       <uri>model://Drone</uri>
       <name>ur2_prop_drone</name>

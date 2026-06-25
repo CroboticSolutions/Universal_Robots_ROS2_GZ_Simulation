@@ -11,7 +11,7 @@
   direction: "GZ_TO_ROS"
 
 # --- ur1 (namespace-style ROS topics) ---
-# RGB image
+# RGB image — gz topic path must match `gz topic -l` (often .../wrist_3_link/... for this sim export).
 - ros_topic_name: "/ur1/camera/image_raw"
   gz_topic_name: "/world/lab_table_coke/model/ur1/link/wrist_3_link/sensor/camera/image"
   ros_type_name: "sensor_msgs/msg/Image"

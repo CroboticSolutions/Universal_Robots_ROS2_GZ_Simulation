@@ -1,16 +1,18 @@
 <?xml version="1.0" ?>
 <sdf version="1.6">
   <model name="black_and_decker_cordless_drill">
-    <static>true</static>
+    <static>false</static>
     <include>
       <uri>https://fuel.ignitionrobotics.org/1.0/OpenRobotics/models/Artifact Proximity Detector</uri>
    </include>
     <link name="link">
+      <!-- Primitive box = AABB of meshes/drill.dae (COLLADA unit 1 unit = 1 cm). -->
       <collision name="collision">
+        <pose>0 0.0601 0.1275 0 0 0</pose>
         <geometry>
-          <mesh>
-            <uri>meshes/drill.dae</uri>
-          </mesh>
+          <box>
+            <size>0.076 0.223 0.255</size>
+          </box>
         </geometry>
       </collision>
       <visual name="visual">
