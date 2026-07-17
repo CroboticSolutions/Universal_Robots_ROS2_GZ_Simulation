@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026
 # SPDX-License-Identifier: BSD-3-Clause
-"""Sekvenca za arm_api2 (moveit2_simple_iface) u ROS namespaceu npr. ur1.
+"""Sekvenca za arm_api2 (moveit2_iface) u ROS namespaceu npr. ur1.
 
 Koristi:
   - arm_api2_msgs/srv/ChangeState (JOINT_TRAJ_CTL / CART_TRAJ_CTL)
